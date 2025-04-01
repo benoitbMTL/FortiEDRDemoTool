@@ -1,0 +1,5 @@
+Traceback (most recent call last):
+  File "main.py", line 133, in <module>
+  File "main.py", line 39, in __init__
+  File "PIL\Image.py", line 3465, in open
+FileNotFoundError: [Errno 2] No such file or directory: 'assets\\fortinet-logo-white.png'

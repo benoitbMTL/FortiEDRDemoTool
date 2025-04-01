@@ -1,0 +1,33 @@
+# Ignorer les fichiers d'environnement
+.env
+.env.*
+
+# Fichiers de configuration perso
+*.local
+*.secret
+
+# Bytecode Python
+__pycache__/
+*.py[cod]
+
+# Fichiers compilés
+*.exe
+*.dll
+*.so
+
+# Dossiers virtuels
+venv/
+env/
+.venv/
+
+# Logs
+*.log
+
+# Fichiers système
+.DS_Store
+Thumbs.db
+
+# Dossiers PyInstaller / dist
+build/
+dist/
+*.spec
