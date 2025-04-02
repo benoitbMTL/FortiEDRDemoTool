@@ -5,7 +5,7 @@ echo ================================
 echo Building EXE with PyInstaller...
 echo ================================
 
-pyinstaller main.py ^
+pyinstaller app.py ^
  --onefile ^
  --noconsole ^
  --icon=assets/fortinet.ico ^

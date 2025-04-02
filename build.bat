@@ -1,15 +1,15 @@
 @echo off
 setlocal
 
-echo === Building main.exe with PyInstaller ===
+echo === Building app.exe with PyInstaller ===
 
-REM Check if main.exe is running or locked
-if exist dist\main.exe (
-    echo Attempting to delete dist\main.exe...
+REM Check if app.exe is running or locked
+if exist dist\app.exe (
+    echo Attempting to delete dist\app.exe...
 
-    del /f dist\main.exe >nul 2>&1
-    if exist dist\main.exe (
-        echo ERROR: Unable to delete dist\main.exe. It may still be running.
+    del /f dist\app.exe >nul 2>&1
+    if exist dist\app.exe (
+        echo ERROR: Unable to delete dist\app.exe. It may still be running.
         echo Please close it before building again.
         pause
         exit /b 1
@@ -19,19 +19,19 @@ if exist dist\main.exe (
 REM Clean previous build folders
 rmdir /s /q dist
 rmdir /s /q build
-del main.spec 2>nul
+del app.spec 2>nul
 
 REM Build the executable
 pyinstaller --noconfirm --onefile --windowed ^
 --add-data "assets;assets" ^
 --add-data ".env;." ^
-main.py
+app.py
 
 REM Check if build succeeded
-if exist dist\main.exe (
-    echo Build succeeded. Launching main.exe...
+if exist dist\app.exe (
+    echo Build succeeded. Launching app.exe...
     cd dist
-    start main.exe
+    start app.exe
 ) else (
     echo Build failed. Please check for errors above.
 )

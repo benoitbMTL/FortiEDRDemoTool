@@ -1,11 +1,12 @@
 import tkinter as tk
 import customtkinter as ctk
-from mitre import MitreView
-from malware import MalwareBazaarView
-from api import FortiEDRAPIView
 from PIL import Image, ImageTk
 import os
 import sys
+
+from gui.mitre_gui import MitreView
+from gui.malware_gui import MalwareBazaarView
+from gui.api_gui import FortiEDRAPIView
 
 # Always start in dark mode
 ctk.set_appearance_mode("dark")
@@ -45,16 +46,7 @@ class FortiEDRDemoTool(ctk.CTk):
         self.logo_label.grid(row=0, column=0, pady=(15, 5))
 
         def create_nav_button(parent, text, command):
-            btn = ctk.CTkButton(
-                parent,
-                text=text,
-                command=command,
-                fg_color="#2e2e2e",
-                hover_color="#444444",
-                text_color="white",
-                corner_radius=6,
-                font=("Arial", 12, "bold")
-            )
+            btn = ctk.CTkButton(parent, text=text, command=command, fg_color="#2e2e2e", hover_color="#444444", text_color="white", corner_radius=6, font=("Arial", 12, "bold"))
             return btn
 
         self.active_nav = None

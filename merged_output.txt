@@ -1,320 +1,83 @@
 Merged Python Files
 ====================
 Directory structure:
- - api.py
- - main.py
- - malware.py
- - mitre.py
- - tests.py
- - widgets.py
+fortiedr-demo-gui/
+    .env
+    .gitignore
+    app.py
+    app.spec
+    build.bat
+    installer.bat
+    merged_output.txt
+    requirements.txt
+    run.bat
+    assets/
+        fortinet-logo-white.png
+        fortinet.ico
+    backend/
+        api_backend.py
+        malware_backend.py
+        mitre_backend.py
+        __init__.py
+        __pycache__/
+            mitre_backend.cpython-313.pyc
+            __init__.cpython-313.pyc
+    build/
+        app/
+            Analysis-00.toc
+            app.pkg
+            base_library.zip
+            EXE-00.toc
+            PKG-00.toc
+            PYZ-00.pyz
+            PYZ-00.toc
+            warn-app.txt
+            xref-app.html
+            localpycs/
+                pyimod01_archive.pyc
+                pyimod02_importers.pyc
+                pyimod03_ctypes.pyc
+                pyimod04_pywin32.pyc
+                struct.pyc
+    data/
+        tests.py
+        __init__.py
+        __pycache__/
+            tests.cpython-313.pyc
+            __init__.cpython-313.pyc
+    dist/
+        app.exe
+    gui/
+        api_gui.py
+        malware_gui.py
+        mitre_gui.py
+        widgets.py
+        __init__.py
+        __pycache__/
+            api_gui.cpython-313.pyc
+            malware_gui.cpython-313.pyc
+            mitre_gui.cpython-313.pyc
+            __init__.cpython-313.pyc
+
+Selected Python files:
+ - app.py
+ - backend\api_backend.py
+ - backend\malware_backend.py
+ - backend\mitre_backend.py
+ - backend\__init__.py
 
 =================
-api.py
-=================
-import customtkinter as ctk
-import tkinter as tk
-from dotenv import load_dotenv
-import os
-
-load_dotenv()
-
-DEFAULT_API_URL = os.getenv("API_URL") or ""
-DEFAULT_API_USERNAME = os.getenv("API_USERNAME") or ""
-DEFAULT_API_PASSWORD = os.getenv("API_PASSWORD") or ""
-DEFAULT_API_ORG = os.getenv("API_ORG") or ""
-
-EVENT_FORMATS = ["Table", "JSON"]
-EVENT_ITEMS = ["1", "5", "10", "50", "No limit"]
-EVENT_ACTIONS = ["All", "Block", "SimulationBlock", "Log"]
-EVENT_TIMES = ["1 hour", "2 hours", "12 hours", "24 hours", "48 hours"]
-
-THREAT_FORMATS = ["Table", "JSON"]
-THREAT_CATEGORIES = ["All", "Process", "File", "Registry", "Network", "Event Log"]
-THREAT_TIMES = ["lastHour", "last12hours", "last24hours", "last7days", "last30days"]
-THREAT_ITEMS = ["1", "5", "10", "100"]
-
-class FortiEDRAPIView:
-    def __init__(self, options_frame, results_frame):
-        self.options_frame = options_frame
-        self.results_frame = results_frame
-        self.selected_mode = "Events"
-        self.ev_vars = {}
-        self.th_vars = {}
-        self.test_btn = None
-        self.button_width = 100
-
-        self.ev_buttons = {"format": [], "items": [], "action": [], "time": []}
-        self.th_buttons = {"format": [], "items": [], "category": [], "time": []}
-
-        self.setup_ui()
-
-    def setup_ui(self):
-        ctk.CTkLabel(self.options_frame, text="FortiEDR API", font=("Arial", 16, "bold"), text_color="#FFA500").pack(pady=(10, 5), padx=10, anchor="w")
-
-        self.api_mode = ctk.CTkSegmentedButton(
-            self.options_frame,
-            values=["Events", "Threat Hunting", "API Settings"],
-            command=self.switch_mode
-        )
-        self.api_mode.set("Events")
-        self.api_mode.pack(pady=(0, 10), padx=10, anchor="w")
-
-        canvas = tk.Canvas(self.options_frame, bg="#212121", highlightthickness=0, bd=0)
-        canvas.pack(side="top", fill="both", expand=True, padx=10)
-
-        inner_frame = ctk.CTkFrame(canvas, fg_color="transparent")
-        window_id = canvas.create_window((0, 0), window=inner_frame, anchor="nw")
-
-        def on_configure(event): canvas.configure(scrollregion=canvas.bbox("all"))
-        def resize(event): canvas.itemconfig(window_id, width=event.width)
-        inner_frame.bind("<Configure>", on_configure)
-        canvas.bind("<Configure>", resize)
-
-        def _on_mousewheel(event):
-            canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
-        canvas.bind("<Enter>", lambda e: canvas.bind_all("<MouseWheel>", _on_mousewheel))
-        canvas.bind("<Leave>", lambda e: canvas.unbind_all("<MouseWheel>"))
-
-        self.inner_frame = inner_frame
-
-        self.bottom_frame = ctk.CTkFrame(self.options_frame, fg_color="transparent")
-        self.bottom_frame.pack(side="bottom", fill="x", padx=10, pady=(5, 20))
-
-        self.search_btn = ctk.CTkButton(self.bottom_frame, text="Search", command=self.execute, width=100)
-        self.search_btn.pack(side="right")
-
-        self.result_box = ctk.CTkTextbox(self.results_frame)
-        self.result_box.pack(expand=True, fill="both", padx=10, pady=10)
-        self.result_box.insert("0.0", "API output will appear here...")
-
-        self.switch_mode("Events")
-
-    def switch_mode(self, mode):
-        self.selected_mode = mode
-        self.build_ui(mode)
-
-    def build_ui(self, mode):
-        # Clear previous content
-        for widget in self.inner_frame.winfo_children():
-            widget.destroy()
-
-        # === EVENTS MODE ===
-        if mode == "Events":
-            if self.test_btn:
-                self.test_btn.pack_forget()
-
-            self.ev_buttons = {"format": [], "items": [], "action": [], "time": []}
-            self.ev_vars = {"format": "Table", "items": "1", "action": "All", "time": "1 hour"}
-
-            self.search_btn.pack(side="right")
-
-            container = ctk.CTkFrame(self.inner_frame, fg_color="transparent")
-            container.pack(pady=0)
-
-            col1 = ctk.CTkFrame(container, fg_color="transparent", width=180)
-            col1.pack(side="left", padx=(0, 30), fill="y")
-
-            col2 = ctk.CTkFrame(container, fg_color="transparent", width=180)
-            col2.pack(side="left", padx=(30, 0), fill="y")
-
-            # Column 1: Format + Items
-            ctk.CTkLabel(col1, text="Format", font=("Arial", 11, "bold"), text_color="white").pack(anchor="w", pady=(10, 2))
-            for opt in EVENT_FORMATS:
-                btn = ctk.CTkButton(col1, text=opt, width=140,
-                    command=lambda v=opt: self.set_var("format", v, "ev"),
-                    fg_color="#FFA500" if opt == "Table" else "#2e2e2e",
-                    hover_color="#FFA500" if opt == "Table" else "#444444",
-                    text_color="white")
-                btn.pack(pady=2, fill="x")
-                self.ev_buttons["format"].append(btn)
-
-            ctk.CTkLabel(col1, text="Number of Events", font=("Arial", 11, "bold"), text_color="white").pack(anchor="w", pady=(15, 2))
-            for opt in EVENT_ITEMS:
-                btn = ctk.CTkButton(col1, text=opt, width=140, command=lambda v=opt: self.set_var("items", v, "ev"),
-                                    fg_color="#FFA500" if opt == "1" else "#2e2e2e",
-                                    hover_color="#FFA500" if opt == "1" else "#444444",
-                                    text_color="white")
-                btn.pack(pady=2, fill="x")
-                self.ev_buttons["items"].append(btn)
-
-            # Column 2: Action + Time
-            ctk.CTkLabel(col2, text="Action Filter", font=("Arial", 11, "bold"), text_color="white").pack(anchor="w", pady=(10, 2))
-            for opt in EVENT_ACTIONS:
-                btn = ctk.CTkButton(col2, text=opt, width=140, command=lambda v=opt: self.set_var("action", v, "ev"),
-                                    fg_color="#FFA500" if opt == "All" else "#2e2e2e",
-                                    hover_color="#FFA500" if opt == "All" else "#444444",
-                                    text_color="white")
-                btn.pack(pady=2, fill="x")
-                self.ev_buttons["action"].append(btn)
-
-            ctk.CTkLabel(col2, text="Time Range", font=("Arial", 11, "bold"), text_color="white").pack(anchor="w", pady=(15, 2))
-            for opt in EVENT_TIMES:
-                btn = ctk.CTkButton(col2, text=opt, width=140, command=lambda v=opt: self.set_var("time", v, "ev"),
-                                    fg_color="#FFA500" if opt == "1 hour" else "#2e2e2e",
-                                    hover_color="#FFA500" if opt == "1 hour" else "#444444",
-                                    text_color="white")
-                btn.pack(pady=2, fill="x")
-                self.ev_buttons["time"].append(btn)
-
-        # === THREAT HUNTING MODE ===
-        elif mode == "Threat Hunting":
-            if self.test_btn:
-                self.test_btn.pack_forget()
-
-            # Réinitialiser les boutons et les valeurs sélectionnées
-            self.th_buttons = {"format": [], "items": [], "category": [], "time": []}
-            self.th_vars = {"format": "Table", "items": "1", "category": "All", "time": "lastHour"}
-
-            self.search_btn.pack(side="right")
-
-            container = ctk.CTkFrame(self.inner_frame, fg_color="transparent")
-            container.pack(pady=0)
-
-            col1 = ctk.CTkFrame(container, fg_color="transparent", width=180)
-            col1.pack(side="left", padx=(0, 30), fill="y")
-
-            col2 = ctk.CTkFrame(container, fg_color="transparent", width=180)
-            col2.pack(side="left", padx=(30, 0), fill="y")
-
-            # Column 1: Format + Items
-            ctk.CTkLabel(col1, text="Format", font=("Arial", 11, "bold"), text_color="white").pack(anchor="w", pady=(10, 2))
-            for opt in THREAT_FORMATS:
-                btn = ctk.CTkButton(col1, text=opt, width=140, command=lambda v=opt: self.set_var("format", v, "th"),
-                                    fg_color="#FFA500" if opt == "Table" else "#2e2e2e",
-                                    hover_color="#FFA500" if opt == "Table" else "#444444",
-                                    text_color="white")
-                btn.pack(pady=2, fill="x")
-                self.th_buttons["format"].append(btn)
-
-            ctk.CTkLabel(col1, text="Items", font=("Arial", 11, "bold"), text_color="white").pack(anchor="w", pady=(15, 2))
-            for opt in THREAT_ITEMS:
-                btn = ctk.CTkButton(col1, text=opt, width=140, command=lambda v=opt: self.set_var("items", v, "th"),
-                                    fg_color="#FFA500" if opt == "1" else "#2e2e2e",
-                                    hover_color="#FFA500" if opt == "1" else "#444444",
-                                    text_color="white")
-                btn.pack(pady=2, fill="x")
-                self.th_buttons["items"].append(btn)
-
-            # Column 2: Category + Time
-            ctk.CTkLabel(col2, text="Category", font=("Arial", 11, "bold"), text_color="white").pack(anchor="w", pady=(10, 2))
-            for opt in THREAT_CATEGORIES:
-                btn = ctk.CTkButton(col2, text=opt, width=140, command=lambda v=opt: self.set_var("category", v, "th"),
-                                    fg_color="#FFA500" if opt == "All" else "#2e2e2e",
-                                    hover_color="#FFA500" if opt == "All" else "#444444",
-                                    text_color="white")
-                btn.pack(pady=2, fill="x")
-                self.th_buttons["category"].append(btn)
-
-            ctk.CTkLabel(col2, text="Time Range", font=("Arial", 11, "bold"), text_color="white").pack(anchor="w", pady=(15, 2))
-            for opt in THREAT_TIMES:
-                btn = ctk.CTkButton(col2, text=opt, width=140, command=lambda v=opt: self.set_var("time", v, "th"),
-                                    fg_color="#FFA500" if opt == "lastHour" else "#2e2e2e",
-                                    hover_color="#FFA500" if opt == "lastHour" else "#444444",
-                                    text_color="white")
-                btn.pack(pady=2, fill="x")
-                self.th_buttons["time"].append(btn)
-
-        # === API SETTINGS MODE ===
-        elif mode == "API Settings":
-            self.search_btn.pack_forget()
-
-            entry_width = 360
-
-            ctk.CTkLabel(self.inner_frame, text="API URL", font=("Arial", 11, "bold"), text_color="white").pack(anchor="w", padx=10)
-            self.url_entry = ctk.CTkEntry(self.inner_frame, width=entry_width)
-            self.url_entry.pack(pady=(0, 10), anchor="w", padx=10)
-            self.url_entry.insert(0, DEFAULT_API_URL)
-
-            ctk.CTkLabel(self.inner_frame, text="Username", font=("Arial", 11, "bold"), text_color="white").pack(anchor="w", padx=10)
-            self.username_entry = ctk.CTkEntry(self.inner_frame, width=entry_width)
-            self.username_entry.pack(pady=(0, 10), anchor="w", padx=10)
-            self.username_entry.insert(0, DEFAULT_API_USERNAME)
-
-            ctk.CTkLabel(self.inner_frame, text="Password", font=("Arial", 11, "bold"), text_color="white").pack(anchor="w", padx=10)
-            self.password_entry = ctk.CTkEntry(self.inner_frame, width=entry_width, show="*")
-            self.password_entry.pack(pady=(0, 10), anchor="w", padx=10)
-            self.password_entry.insert(0, DEFAULT_API_PASSWORD)
-
-            ctk.CTkLabel(self.inner_frame, text="Organization", font=("Arial", 11, "bold"), text_color="white").pack(anchor="w", padx=10)
-            self.org_entry = ctk.CTkEntry(self.inner_frame, width=entry_width)
-            self.org_entry.pack(pady=(0, 10), anchor="w", padx=10)
-            self.org_entry.insert(0, DEFAULT_API_ORG)
-
-            # Right-aligned Test button
-            btn_frame = ctk.CTkFrame(self.inner_frame, fg_color="transparent")
-            btn_frame.pack(fill="x", pady=(10, 10), padx=10)
-
-            self.test_btn = ctk.CTkButton(btn_frame, text="Test", command=self.test_api, width=100)
-            self.test_btn.pack(side="right")
-
-
-    def execute(self):
-        if self.selected_mode == "Events":
-            vals = self.ev_vars
-            summary = f"""Executing FortiEDR API (Events Mode)...
-
-    Selected:
-    - Format: {vals.get("format", "N/A")}
-    - Number of Events: {vals.get("items", "N/A")}
-    - Action Filter: {vals.get("action", "N/A")}
-    - Time Range: {vals.get("time", "N/A")}
-    """
-        elif self.selected_mode == "Threat Hunting":
-            vals = self.th_vars
-            summary = f"""Executing FortiEDR API (Threat Hunting Mode)...
-
-    Selected:
-    - Format: {vals.get("format", "N/A")}
-    - Items: {vals.get("items", "N/A")}
-    - Category: {vals.get("category", "N/A")}
-    - Time Range: {vals.get("time", "N/A")}
-    """
-        else:
-            summary = "Nothing to execute in this mode."
-
-        self.result_box.delete("0.0", "end")
-        self.result_box.insert("0.0", summary)
-
-    def set_var(self, key, value, mode_prefix):
-        # Set selected value
-        if mode_prefix == "ev":
-            self.ev_vars[key] = value
-            group = self.ev_buttons.get(key, [])
-        elif mode_prefix == "th":
-            self.th_vars[key] = value
-            group = self.th_buttons.get(key, [])
-        else:
-            return
-
-        # Update button colors in this group
-        for btn in group:
-            try:
-                if btn.cget("text") == value:
-                    btn.configure(fg_color="#FFA500", hover_color="#FFA500")
-                else:
-                    btn.configure(fg_color="#2e2e2e", hover_color="#444444")
-            except tk.TclError:
-                continue
-
-
-    def test_api(self):
-        result = "API test successful.\n\nURL: {}\nUser: {}\nOrg: {}".format(
-            DEFAULT_API_URL, DEFAULT_API_USERNAME, DEFAULT_API_ORG
-        )
-        self.result_box.delete("0.0", "end")
-        self.result_box.insert("0.0", result)
-
-=================
-main.py
+app.py
 =================
 import tkinter as tk
 import customtkinter as ctk
-from mitre import MitreView
-from malware import MalwareBazaarView
-from api import FortiEDRAPIView
 from PIL import Image, ImageTk
 import os
 import sys
+
+from gui.mitre_gui import MitreView
+from gui.malware_gui import MalwareBazaarView
+from gui.api_gui import FortiEDRAPIView
 
 # Always start in dark mode
 ctk.set_appearance_mode("dark")
@@ -443,443 +206,34 @@ if __name__ == "__main__":
     app.mainloop()
 
 =================
-malware.py
+backend\api_backend.py
 =================
-import customtkinter as ctk
-import tkinter as tk
-
-class MalwareBazaarView:
-    def __init__(self, options_frame, results_frame):
-        self.options_frame = options_frame
-        self.results_frame = results_frame
-        self.filetype_buttons = []
-        self.tag_buttons = []
-        self.selected_filetype = "exe"
-        self.selected_tag = None
-
-        # Grouped file types and tags
-        self.filetype_groups = {
-            "Executables": ["exe", "dll", "msi"],
-            "Scripts": ["ps1", "bat", "js", "vbs"],
-            "Documents": ["doc", "docx", "xls", "xlsx", "pdf"],
-            "Archives / Images": ["zip", "rar", "iso"]
-        }
-
-        self.tag_groups = {
-            "RATs / Stealers": ["agenttesla", "remcos", "lokibot", "redline", "formbook", "nanocore", "rat", "infostealer", "mirai"],
-            "Banking / Loaders": ["emotet", "quakbot", "dridex"],
-            "Generic Tags": ["ransomware", "trojan", "downloader"]
-        }
-
-        self.show_interface()
-
-    def show_interface(self):
-        # Title
-        ctk.CTkLabel(self.options_frame, text="Download recent malware samples from MalwareBazaar", font=("Arial", 16, "bold"), text_color="#FFA500").pack(pady=(10, 0), padx=10, anchor="w")
-
-        # Subtitle
-        ctk.CTkLabel(self.options_frame, text="Select a file type or a tag", font=("Arial", 14), text_color="white").pack(pady=(0, 10), padx=10, anchor="w")
-
-        # === Scrollable Frame ===
-        canvas = tk.Canvas(self.options_frame, highlightthickness=0, bg="#212121", bd=0)
-        canvas.pack(side="top", fill="both", expand=True, padx=10)
-
-        # Inner frame inside the canvas
-        inner_frame = ctk.CTkFrame(canvas, fg_color="transparent")
-        window_id = canvas.create_window((0, 0), window=inner_frame, anchor="nw")
-
-        def on_configure(event):
-            canvas.configure(scrollregion=canvas.bbox("all"))
-        inner_frame.bind("<Configure>", on_configure)
-
-        def resize_width(event):
-            canvas.itemconfig(window_id, width=event.width)
-        canvas.bind("<Configure>", resize_width)
-
-        def on_mousewheel(event):
-            canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
-        canvas.bind_all("<MouseWheel>", on_mousewheel)
-
-        canvas.configure(yscrollcommand=lambda *args: None)  # No visible scrollbar
-
-        # === Container for columns ===
-        criteria_frame = ctk.CTkFrame(inner_frame, fg_color="transparent")
-        criteria_frame.pack(pady=0)
-
-        # Columns
-        filetype_col = ctk.CTkFrame(criteria_frame, fg_color="transparent", width=140)
-        filetype_col.pack(side="left", padx=(0, 30), fill="y")
-        filetype_col.pack_propagate(True)
-
-        tag_col = ctk.CTkFrame(criteria_frame, fg_color="transparent", width=140)
-        tag_col.pack(side="left", padx=(30, 0), fill="y")
-        tag_col.pack_propagate(True)
-
-        # File Types
-        ctk.CTkLabel(filetype_col, text="File Types", font=("Arial", 14, "bold"), text_color="#FFA500").pack(anchor="w", pady=(0, 5))
-        for group, types in self.filetype_groups.items():
-            ctk.CTkLabel(filetype_col, text=group, font=("Arial", 11, "bold"), text_color="white").pack(anchor="w", pady=(10, 2))
-            for ft in types:
-                is_selected = ft == self.selected_filetype
-                btn = ctk.CTkButton(filetype_col, text=ft, width=140, command=lambda f=ft: self.select_filetype(f),
-                                    fg_color="#FFA500" if is_selected else "#2e2e2e",
-                                    hover_color="#FFA500" if is_selected else "#444444",
-                                    text_color="white")
-                btn.pack(pady=2, fill="x")
-                self.filetype_buttons.append(btn)
-
-        # Tags
-        ctk.CTkLabel(tag_col, text="Tags", font=("Arial", 14, "bold"), text_color="#FFA500").pack(anchor="w", pady=(0, 5))
-        for group, tags in self.tag_groups.items():
-            ctk.CTkLabel(tag_col, text=group, font=("Arial", 11, "bold"), text_color="white").pack(anchor="w", pady=(10, 2))
-            for tg in tags:
-                btn = ctk.CTkButton(tag_col, text=tg, width=140, command=lambda t=tg: self.select_tag(t),
-                                    fg_color="#2e2e2e", hover_color="#444444", text_color="white")
-                btn.pack(pady=2, fill="x")
-                self.tag_buttons.append(btn)
-
-        # === Download area at bottom ===
-        bottom_frame = ctk.CTkFrame(self.options_frame, fg_color="transparent")
-        bottom_frame.pack(side="bottom", fill="x", padx=10, pady=(5, 20))
-
-        inner = ctk.CTkFrame(bottom_frame, fg_color="transparent")
-        inner.pack(side="right")
-
-        ctk.CTkLabel(inner, text="Number of Files:", font=("Arial", 12)).pack(side="left", padx=(0, 5))
-        self.mb_num_files = ctk.CTkEntry(inner, width=60, placeholder_text="1")
-        self.mb_num_files.insert(0, "1")
-        self.mb_num_files.pack(side="left", padx=(0, 10))
-        ctk.CTkButton(inner, text="Download", command=self.execute, width=100).pack(side="left")
-
-        # Right panel results
-        self.result_box = ctk.CTkTextbox(self.results_frame)
-        self.result_box.pack(expand=True, fill="both", padx=10, pady=10)
-        self.result_box.insert("0.0", "MalwareBazaar results will appear here...")
-
-        self.select_filetype("exe")
-
-    def select_filetype(self, selected):
-        self.selected_filetype = selected
-        self.selected_tag = None
-
-        for btn in self.filetype_buttons:
-            is_selected = btn.cget("text") == selected
-            btn.configure(
-                fg_color="#FFA500" if is_selected else "#2e2e2e",
-                hover_color="#FFA500" if is_selected else "#444444",
-                text_color="white"
-            )
-
-        for btn in self.tag_buttons:
-            btn.configure(
-                fg_color="#2e2e2e",
-                hover_color="#444444",
-                text_color="white"
-            )
-
-    def select_tag(self, selected):
-        self.selected_tag = selected
-        self.selected_filetype = None
-
-        for btn in self.tag_buttons:
-            is_selected = btn.cget("text") == selected
-            btn.configure(
-                fg_color="#FFA500" if is_selected else "#2e2e2e",
-                hover_color="#FFA500" if is_selected else "#444444",
-                text_color="white"
-            )
-
-        for btn in self.filetype_buttons:
-            btn.configure(
-                fg_color="#2e2e2e",
-                hover_color="#444444",
-                text_color="white"
-            )
-
-    def execute(self):
-        file_type = self.selected_filetype or "None"
-        tag = self.selected_tag or "None"
-        num = self.mb_num_files.get() or "1"
-
-        summary = f"""Downloading samples from MalwareBazaar...
-
-Selected:
-- File Type: {file_type}
-- Tag: {tag}
-- Number of Files: {num}
-
-[Simulated download output...]
-"""
-        self.result_box.delete("0.0", "end")
-        self.result_box.insert("0.0", summary)
 
 =================
-mitre.py
+backend\malware_backend.py
 =================
-import customtkinter as ctk
-import tkinter as tk
-from tkinter import messagebox
-from tests import tests
 
-class MitreView:
-    def __init__(self, options_frame, results_frame):
-        self.options_frame = options_frame
-        self.results_frame = results_frame
-        self.selected_test = None
-        self.test_buttons = []
-        self.setup_ui()
+=================
+backend\mitre_backend.py
+=================
+import subprocess
 
-    def setup_ui(self):
-        # Title
-        title = ctk.CTkLabel(
-            self.options_frame,
-            text="Select a MITRE technique to execute",
-            font=("Arial", 16, "bold"),
-            text_color="#FFA500"
+def execute_atomic_test(command):
+    """
+    Executes the given PowerShell command using subprocess.
+    Returns stdout and stderr as a tuple.
+    """
+    try:
+        result = subprocess.run(
+            ["powershell", "-ExecutionPolicy", "Bypass", "-Command", command],
+            capture_output=True,
+            text=True,
+            timeout=60
         )
-        title.pack(pady=(10, 5), padx=10, anchor="w")
-
-        # Main container using grid layout
-        container = ctk.CTkFrame(self.options_frame, fg_color="transparent")
-        container.pack(fill="both", expand=True, padx=10)
-
-        container.grid_columnconfigure(0, weight=1)
-
-        # === Frame for test buttons ===
-        self.button_list_frame = ctk.CTkFrame(container, fg_color="transparent", width=340)
-        self.button_list_frame.grid(row=0, column=0, sticky="w", pady=(0, 5))
-
-        self.test_buttons = []
-        for test in tests:
-            btn = ctk.CTkButton(
-                self.button_list_frame,
-                text=f"{test['id']} - {test['title']}",
-                width=340,
-                anchor="w",
-                height=30,
-                text_color="white",
-                fg_color="#2e2e2e",
-                hover_color="#444444",
-                command=lambda t=test: self.select_test(t)
-            )
-            btn.pack(fill="x", pady=2)
-            self.test_buttons.append(btn)
-
-        # === Execute / Reset buttons ===
-        self.command_frame = ctk.CTkFrame(container, fg_color="transparent")
-        self.command_frame.grid(row=1, column=0, sticky="e", pady=(5, 5))
-
-        self.exec_button = ctk.CTkButton(self.command_frame, text="Execute", command=self.execute_test, width=100)
-        self.exec_button.pack(side="right", padx=(5, 0))
-
-        self.reset_button = ctk.CTkButton(
-            self.command_frame,
-            text="Reset",
-            command=self.reset_results,
-            width=100,
-            fg_color="#2e2e2e",
-            hover_color="#444444",
-            text_color="white"
-        )
-        self.reset_button.pack(side="right", padx=(0, 5))
-
-        # === Description Box (just under Execute) ===
-        self.description_box = ctk.CTkTextbox(container, wrap="word", activate_scrollbars=False)
-        self.description_box.grid(row=2, column=0, sticky="nsew", pady=(5, 10))
-        self.description_box.configure(state="disabled")
-
-        container.grid_rowconfigure(2, weight=1)
-
-        # === Results on the right side ===
-        self.result_box = ctk.CTkTextbox(self.results_frame)
-        self.result_box.pack(expand=True, fill="both", padx=10, pady=10)
-        self.result_box.insert("0.0", "Execution results will appear here...")
-
-        # Preselect the first test
-        if tests:
-            self.select_test(tests[0])
-
-    def select_test(self, test):
-        self.selected_test = test
-
-        # Update button colors
-        for btn in self.test_buttons:
-            if btn.cget("text").startswith(test["id"]):
-                btn.configure(fg_color="#FFA500", hover_color="#FFA500", text_color="white")
-            else:
-                btn.configure(fg_color="#2e2e2e", hover_color="#444444", text_color="white")
-
-        # Fill the description box with highlighted sections
-        self.description_box.configure(state="normal")
-        self.description_box.delete("0.0", "end")
-
-        # Test name (highlighted)
-        self.description_box.insert("0.0", f"{test['test']}\n", ("orange",))
-        self.description_box.insert("end", f"{test['description']}\n\n")
-
-        # FortiEDR Violated Policies (highlighted)
-        self.description_box.insert("end", "Violated Policies\n", ("orange",))
-        for rule in test["rules"]:
-            if rule.startswith("-"):
-                # Sub-rule: add dash + indent
-                self.description_box.insert("end", f"  - {rule[2:]}\n")
-            else:
-                # Main rule: category name
-                self.description_box.insert("end", f"{rule}\n")
-
-        # Command section
-        self.description_box.insert("end", "\nCommand\n", ("orange",))
-        self.description_box.insert("end", f"{test['command']}")
-
-        # Tag style (bold not supported in CTkTextbox)
-        self.description_box.tag_config("orange", foreground="#FFA500")
-
-    def execute_test(self):
-        if not self.selected_test:
-            messagebox.showwarning("No Test Selected", "Please select a test to execute.")
-            return
-
-        # Simulated output (to be replaced later by real execution)
-        command = self.selected_test["command"]
-        output = f"Executing test:\n\n{command}\n\n[Simulated command output here...]"
-
-        self.result_box.delete("0.0", "end")
-        self.result_box.insert("0.0", output)
-
-    def reset_results(self):
-        self.result_box.delete("0.0", "end")
-        self.result_box.insert("0.0", "Execution results will appear here...")
+        return result.stdout.strip(), result.stderr.strip()
+    except Exception as e:
+        return "", f"Execution error: {str(e)}"
 
 =================
-tests.py
+backend\__init__.py
 =================
-# JSON data for MITRE tests
-tests = [
-    {
-        "id": "T1027.007",
-        "title": "Obfuscated Files or Information: Dynamic API Resolution",
-        "test": "Dynamic API Resolution - Ninja-syscall",
-        "description": "This test calls NtCreateFile via API hashing and dynamic syscall resolution. I have dubbed this particular combination of techniques 'Ninja-syscall'. When successful, a new file named 'hello.log' will be created in the default user's temporary folder, which is a common location for a dropper.",
-        "rules": [
-            "Execution Prevention",
-            "- Malicious File Detected"
-        ],
-        "command": "Invoke-AtomicTest T1027.007 -TestNumbers 1"
-    },
-    {
-        "id": "T1036.003",
-        "title": "Masquerading: Rename System Utilities",
-        "test": "Masquerading - Windows EXE running as different Windows EXE",
-        "description": "Copies a Windows EXE, renames it as another EXE, and runs it to masquerade as a system utility.",
-        "rules": [
-            "Exfiltration Prevention",
-            "- Fake Critical Program - Attempted to Hide as a Service"
-        ],
-        "command": "Invoke-AtomicTest T1036.003 -TestNumbers 7"
-    },
-    {
-        "id": "T1055",
-        "title": "Process Injection",
-        "test": "Dirty Vanity process Injection",
-        "description": "This test uses the Windows undocumented remote-fork API RtlCreateProcessReflection to create a cloned process of the parent process with shellcode written in its memory. The shellcode is executed after being forked to the child process. The technique was first presented at BlackHat Europe 2022. Shellcode will open a message box and a notepad.",
-        "rules": [
-            "Exfiltration Prevention",
-            "- Injected Process - Process Created from an Injected Thread",
-            "- Injected Thread - Connection from an Injected Thread",
-            "- Malicious File Detected",
-            "- PUP - Potentially Unwanted Program",
-            "- Process Injection - Entry Point Modification Detected",
-            "Ransomware Prevention",
-            "- Injected Process - Process Created from an Injected Thread",
-            "- Injected Thread - Connection from an Injected Thread",
-            "- Malicious File Detected",
-            "- PUP - Potentially Unwanted Program",
-            "- Process Injection - Entry Point Modification Detected"
-        ],
-        "command": "Invoke-AtomicTest T1055 -TestNumbers 4"
-    },
-    {
-        "id": "T1059.001",
-        "title": "Command and Scripting Interpreter: PowerShell",
-        "test": "Download Mimikatz and dump credentials",
-        "description": "Download Mimikatz and dump credentials. Upon execution, Mimikatz dump details and password hashes will be displayed.",
-        "rules": [
-            "Exfiltration Prevention",
-            "- Suspicious Application - Connection Attempt from a Suspicious Application",
-            "- Unmapped Executable - Executable File Without a Corresponding File System Reference"
-        ],
-        "command": "Invoke-AtomicTest T1059.001 -TestNumbers 1"
-    },
-    {
-        "id": "T1105",
-        "title": "Ingress Tool Transfer",
-        "test": "Download a file using wscript",
-        "description": "Use wscript to run a local VisualBasic file to download a remote file.",
-        "rules": [
-            "Exfiltration Prevention",
-            "- Suspicious Application - Connection Attempt from a Suspicious Application"
-        ],
-        "command": "Invoke-AtomicTest T1105 -TestNumbers 26"
-    },
-    {
-        "id": "T1106",
-        "title": "Native API",
-        "test": "Run Shellcode via Syscall in Go",
-        "description": "Runs shellcode in the current running process via a syscall. This technique involves allocating memory for the shellcode using VirtualAlloc with Read/Write permissions, copying the shellcode to the allocated space with the RtlCopyMemory macro, modifying the memory page permissions to Execute/Read using VirtualProtect, and finally executing the shellcode entry point via a syscall.",
-        "rules": [
-            "Execution Prevention",
-            "- Malicious File Detected"
-        ],
-        "command": "Invoke-AtomicTest T1106 -TestNumbers 5"
-    },
-    {
-        "id": "T1134.001",
-        "title": "Access Token Manipulation: Token Impersonation/Theft",
-        "test": "Utilizes Juicy Potato to obtain privilege escalation",
-        "description": "This Atomic utilizes Juicy Potato to obtain privilege escalation. Upon successful execution of this test, a vulnerable CLSID will be used to execute a process with system permissions. This tactic has been previously observed in SnapMC Ransomware, amongst numerous other campaigns.",
-        "rules": [
-            "Execution Prevention",
-            "- Malicious File Detected",
-            "- PUP - Potentially Unwanted Program"
-        ],
-        "command": "Invoke-AtomicTest T1134.001 -TestNumbers 5"
-    },
-    {
-        "id": "T1555.003",
-        "title": "Credentials from Password Stores: Credentials from Web Browsers",
-        "test": "WebBrowserPassView - Credentials from Browser",
-        "description": "The following Atomic test utilizes WebBrowserPassView to extract passwords from browsers on a Windows system. WebBrowserPassView is an open-source application used to retrieve passwords stored on a local computer. Recently noticed as a tool used in the BlackCat Ransomware.",
-        "rules": [
-            "Exfiltration Prevention",
-            "- Malicious File Detected"
-        ],
-        "command": "Invoke-AtomicTest T1555.003 -TestNumbers 15"
-    },
-    {
-        "id": "T1562.002",
-        "title": "Impair Defenses: Disable Windows Event Logging",
-        "test": "Makes Eventlog blind with Phant0m",
-        "description": "Use Phant0m to disable Eventlog.",
-        "rules": [
-            "Exfiltration Prevention",
-            "- Malicious File Detected"
-        ],
-        "command": "Invoke-AtomicTest T1562.002 -TestNumbers 7"
-    }
-]
-=================
-widgets.py
-=================
-import customtkinter as ctk
-
-def create_nav_button(parent, text, command, fg="#1f1f1f", hover="#333333", text_color="white"):
-    return ctk.CTkButton(
-        parent,
-        text=text,
-        command=command,
-        fg_color=fg,
-        hover_color=hover,
-        text_color=text_color,
-        corner_radius=6,
-        font=("Arial", 12, "bold")
-    )
