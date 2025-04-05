@@ -1,5 +1,8 @@
 import os
 
+INCLUDE_GUI = True       # Set to True to include files from the 'gui' folder
+INCLUDE_BACKEND = True   # Set to True to include files from the 'backend' folder
+
 def get_project_structure(base_dir, ignore_names=None):
     """
     Returns the project structure as a formatted string, excluding specified files/folders.
@@ -8,7 +11,7 @@ def get_project_structure(base_dir, ignore_names=None):
     ignore_names = ignore_names or []
 
     for root, dirs, files in os.walk(base_dir):
-        # Filter ignored directories in-place
+        # Exclude ignored directories
         dirs[:] = [d for d in dirs if d not in ignore_names]
 
         level = root.replace(base_dir, "").count(os.sep)
@@ -22,34 +25,41 @@ def get_project_structure(base_dir, ignore_names=None):
             lines.append(f"{sub_indent}{f}")
     return "\n".join(lines)
 
-def merge_python_files(include_gui=False):
+def merge_python_files(include_gui=False, include_backend=False):
     output_file = "merged_output.txt"
     base_dir = os.getcwd()
 
     print("Starting file merge...")
 
-    # 1. Build project structure string
+    # 1. Build the directory structure string
     ignore_list = ["Thumbs.db", ".git", "merge.py"]
     structure = get_project_structure(base_dir, ignore_list)
 
-    # 2. Gather .py files
+    # 2. Collect .py files from root and selected folders
     print("Collecting Python files...")
 
     root_files = [f for f in os.listdir(base_dir)
                   if f.endswith(".py") and f not in ignore_list]
 
-    subfolder = "gui" if include_gui else "backend"
-    subfolder_path = os.path.join(base_dir, subfolder)
     subfolder_files = []
 
-    if os.path.isdir(subfolder_path):
-        subfolder_files = [os.path.join(subfolder, f)
-                           for f in os.listdir(subfolder_path)
-                           if f.endswith(".py")]
+    if include_gui:
+        gui_path = os.path.join(base_dir, "gui")
+        if os.path.isdir(gui_path):
+            subfolder_files += [os.path.join("gui", f)
+                                for f in os.listdir(gui_path)
+                                if f.endswith(".py")]
+
+    if include_backend:
+        backend_path = os.path.join(base_dir, "backend")
+        if os.path.isdir(backend_path):
+            subfolder_files += [os.path.join("backend", f)
+                                for f in os.listdir(backend_path)
+                                if f.endswith(".py")]
 
     all_files = root_files + subfolder_files
 
-    # 3. Write output
+    # 3. Write to the output file
     print("Writing merged_output.txt...")
 
     with open(output_file, "w", encoding="utf-8") as out:
@@ -69,5 +79,4 @@ def merge_python_files(include_gui=False):
     print("Merge complete. Output saved to: merged_output.txt")
 
 if __name__ == "__main__":
-    # Set to True to merge GUI files instead of backend
-    merge_python_files(include_gui=False)
+    merge_python_files(include_gui=INCLUDE_GUI, include_backend=INCLUDE_BACKEND)
