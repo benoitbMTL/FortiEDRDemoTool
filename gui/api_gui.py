@@ -2,6 +2,7 @@ import customtkinter as ctk
 import tkinter as tk
 from dotenv import load_dotenv
 import os
+from backend.api_backend import run_event_query, run_threat_query, test_api_authentication
 
 load_dotenv()
 
@@ -16,7 +17,7 @@ EVENT_ACTIONS = ["All", "Block", "SimulationBlock", "Log"]
 EVENT_TIMES = ["1 hour", "2 hours", "12 hours", "24 hours", "48 hours"]
 
 THREAT_FORMATS = ["Table", "JSON"]
-THREAT_CATEGORIES = ["All", "Process", "File", "Registry", "Network", "Event Log"]
+THREAT_CATEGORIES = ["All", "Process", "File", "Registry", "Network", "Log"]
 THREAT_TIMES = ["lastHour", "last12hours", "last24hours", "last7days", "last30days"]
 THREAT_ITEMS = ["1", "5", "10", "100"]
 
@@ -67,12 +68,17 @@ class FortiEDRAPIView:
         self.bottom_frame = ctk.CTkFrame(self.options_frame, fg_color="transparent")
         self.bottom_frame.pack(side="bottom", fill="x", padx=10, pady=(5, 20))
 
-        self.search_btn = ctk.CTkButton(self.bottom_frame, text="Search", command=self.execute, width=100)
-        self.search_btn.pack(side="right")
+        self.clear_button = ctk.CTkButton(self.bottom_frame, text="Clear", command=self.clear_results, width=100,
+                                        fg_color="#2e2e2e", hover_color="#444444", text_color="white")
 
-        self.result_box = ctk.CTkTextbox(self.results_frame)
+        self.search_btn = ctk.CTkButton(self.bottom_frame, text="Search", command=self.execute, width=100)
+
+        self.test_btn = ctk.CTkButton(self.bottom_frame, text="Test", command=self.test_api, width=100)
+        
+        self.result_box = ctk.CTkTextbox(self.results_frame, font=("Courier", 12))
         self.result_box.pack(expand=True, fill="both", padx=10, pady=10)
-        self.result_box.insert("0.0", "API output will appear here...")
+        self.result_box.insert("0.0", "Waiting for API query...\n\nResults will appear here once you click Search.")
+        self.result_box.tag_config("recap", foreground="#FFA500")
 
         self.switch_mode("Events")
 
@@ -85,6 +91,11 @@ class FortiEDRAPIView:
         for widget in self.inner_frame.winfo_children():
             widget.destroy()
 
+        # Always forget buttons to avoid duplicates
+        self.clear_button.pack_forget()
+        self.search_btn.pack_forget()
+        self.test_btn.pack_forget()
+
         # === EVENTS MODE ===
         if mode == "Events":
             if self.test_btn:
@@ -93,8 +104,9 @@ class FortiEDRAPIView:
             self.ev_buttons = {"format": [], "items": [], "action": [], "time": []}
             self.ev_vars = {"format": "Table", "items": "1", "action": "All", "time": "1 hour"}
 
-            self.search_btn.pack(side="right")
-
+            self.search_btn.pack(in_=self.bottom_frame, side="right", padx=(5, 0))
+            self.clear_button.pack(in_=self.bottom_frame, side="right", padx=(5, 0))
+            
             container = ctk.CTkFrame(self.inner_frame, fg_color="transparent")
             container.pack(pady=0)
 
@@ -152,7 +164,8 @@ class FortiEDRAPIView:
             self.th_buttons = {"format": [], "items": [], "category": [], "time": []}
             self.th_vars = {"format": "Table", "items": "1", "category": "All", "time": "lastHour"}
 
-            self.search_btn.pack(side="right")
+            self.search_btn.pack(in_=self.bottom_frame, side="right", padx=(5, 0))
+            self.clear_button.pack(in_=self.bottom_frame, side="right", padx=(5, 0))
 
             container = ctk.CTkFrame(self.inner_frame, fg_color="transparent")
             container.pack(pady=0)
@@ -230,37 +243,111 @@ class FortiEDRAPIView:
             # Right-aligned Test button
             btn_frame = ctk.CTkFrame(self.inner_frame, fg_color="transparent")
             btn_frame.pack(fill="x", pady=(10, 10), padx=10)
-
+            
             self.test_btn = ctk.CTkButton(btn_frame, text="Test", command=self.test_api, width=100)
-            self.test_btn.pack(side="right")
+            self.test_btn.pack(side="right", padx=(5, 0))
 
+            self.clear_button.pack_forget()  
+            clear_btn_settings = ctk.CTkButton(btn_frame, text="Clear", command=self.clear_results, width=100,
+                                            fg_color="#2e2e2e", hover_color="#444444", text_color="white")
+            clear_btn_settings.pack(side="right", padx=(5, 0))
 
     def execute(self):
-        if self.selected_mode == "Events":
-            vals = self.ev_vars
-            summary = f"""Executing FortiEDR API (Events Mode)...
-
-    Selected:
-    - Format: {vals.get("format", "N/A")}
-    - Number of Events: {vals.get("items", "N/A")}
-    - Action Filter: {vals.get("action", "N/A")}
-    - Time Range: {vals.get("time", "N/A")}
-    """
-        elif self.selected_mode == "Threat Hunting":
-            vals = self.th_vars
-            summary = f"""Executing FortiEDR API (Threat Hunting Mode)...
-
-    Selected:
-    - Format: {vals.get("format", "N/A")}
-    - Items: {vals.get("items", "N/A")}
-    - Category: {vals.get("category", "N/A")}
-    - Time Range: {vals.get("time", "N/A")}
-    """
-        else:
-            summary = "Nothing to execute in this mode."
-
         self.result_box.delete("0.0", "end")
-        self.result_box.insert("0.0", summary)
+
+        try:
+            if self.selected_mode == "Events":
+                vals = self.ev_vars
+
+                result = run_event_query(
+                    output_format=vals.get("format", "table"),
+                    items=vals.get("items", "1"),
+                    action=vals.get("action", "All"),
+                    time_range=vals.get("time", "1 hour")
+                )
+
+                recap = f"FortiEDR Events — Format: {vals.get('format')} | Time: {vals.get('time')} | Action: {vals.get('action')} | Items: {vals.get('items')}\n\n"
+
+                if vals.get("format", "Table").lower() == "json":
+                    self.result_box.insert("0.0", recap)
+                    self.result_box.tag_add("recap", "1.0", "3.0")
+                    self.highlight_json(result)
+                else:
+                    full_output = recap + result + "\n"
+                    self.result_box.insert("0.0", full_output)
+                    self.result_box.tag_add("recap", "1.0", "3.0")
+
+            elif self.selected_mode == "Threat Hunting":
+                vals = self.th_vars
+
+                result = run_threat_query(
+                    fmt=vals.get("format", "table"),
+                    items=vals.get("items", "1"),
+                    category=vals.get("category", "All"),
+                    time_range=vals.get("time", "lastHour")
+                )
+
+                recap = f"Threat Hunting — Format: {vals.get('format')} | Time: {vals.get('time')} | Category: {vals.get('category')} | Items: {vals.get('items')}\n\n"
+
+                if vals.get("format", "Table").lower() == "json":
+                    self.result_box.insert("0.0", recap)
+                    self.result_box.tag_add("recap", "1.0", "3.0")
+                    self.highlight_json(result)
+                else:
+                    full_output = recap + result + "\n"
+                    self.result_box.insert("0.0", full_output)
+                    self.result_box.tag_add("recap", "1.0", "3.0")
+
+            else:
+                self.result_box.insert("0.0", "Nothing to execute in this mode.")
+
+        except Exception as e:
+            self.result_box.delete("0.0", "end")
+            self.result_box.insert("0.0", f"[ERROR] {str(e)}")
+
+    def highlight_json(self, text):
+        # Insérer après recap
+        insert_point = self.result_box.index("end-1c")
+        self.result_box.insert(insert_point, text + "\n")
+
+        # Définir les tags de couleur
+        self.result_box.tag_config("key", foreground="#FFA500")     # orange
+        self.result_box.tag_config("string", foreground="#00FF00")  # vert
+        self.result_box.tag_config("number", foreground="#00BFFF")  # bleu
+        self.result_box.tag_config("boolean", foreground="#FF69B4") # rose
+        self.result_box.tag_config("null", foreground="#FF0000")    # rouge
+
+        # Index de départ réel après l'insertion
+        start_index = int(float(insert_point.split('.')[0]))
+
+        lines = text.splitlines()
+        for i, line in enumerate(lines):
+            line_index = f"{start_index + i}.0"
+
+            if ':' not in line:
+                continue
+
+            key_part, value_part = line.split(':', 1)
+            key_len = len(key_part)
+            value = value_part.strip()
+
+            # Appliquer les couleurs
+            self.result_box.tag_add("key", line_index, f"{line_index}+{key_len}c")
+
+            value_index = f"{line_index}+{key_len + 1}c"
+            if value.startswith('"'):
+                self.result_box.tag_add("string", value_index, f"{value_index}+{len(value)+1}c")
+            elif value in ["true", "false"]:
+                self.result_box.tag_add("boolean", value_index, f"{value_index}+{len(value)+1}c")
+            elif value == "null":
+                self.result_box.tag_add("null", value_index, f"{value_index}+{len(value)+1}c")
+            else:
+                self.result_box.tag_add("number", value_index, f"{value_index}+{len(value)+1}c")
+
+    def test_api(self):
+        result = test_api_authentication()
+        self.result_box.delete("0.0", "end")
+        self.result_box.insert("0.0", result)
 
     def set_var(self, key, value, mode_prefix):
         # Set selected value
@@ -290,3 +377,6 @@ class FortiEDRAPIView:
         )
         self.result_box.delete("0.0", "end")
         self.result_box.insert("0.0", result)
+        
+    def clear_results(self):
+        self.result_box.delete("0.0", "end")
