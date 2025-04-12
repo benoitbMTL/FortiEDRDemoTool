@@ -5,13 +5,6 @@ import os
 import json
 from backend.api_backend import run_event_query, run_threat_query, test_api_authentication
 
-load_dotenv()
-
-DEFAULT_API_URL = os.getenv("API_URL") or ""
-DEFAULT_API_USERNAME = os.getenv("API_USERNAME") or ""
-DEFAULT_API_PASSWORD = os.getenv("API_PASSWORD") or ""
-DEFAULT_API_ORG = os.getenv("API_ORG") or ""
-
 EVENT_FORMATS = ["Table", "JSON"]
 EVENT_ITEMS = ["1", "5", "10", "50", "No limit"]
 EVENT_ACTIONS = ["All", "Block", "SimulationBlock", "Log"]
@@ -22,6 +15,14 @@ THREAT_CATEGORIES = ["All", "Process", "File", "Registry", "Network", "Log"]
 THREAT_TIMES = ["lastHour", "last12hours", "last24hours", "last7days", "last30days"]
 THREAT_ITEMS = ["1", "5", "10", "100"]
 
+def get_default_api_settings():
+    return {
+        "url": os.getenv("API_URL") or "",
+        "username": os.getenv("API_USERNAME") or "",
+        "password": os.getenv("API_PASSWORD") or "",
+        "organization": os.getenv("API_ORG") or ""
+    }
+    
 class FortiEDRAPIView:
     def __init__(self, options_frame, results_frame):
         self.options_frame = options_frame
@@ -36,12 +37,8 @@ class FortiEDRAPIView:
         self.th_buttons = {"format": [], "items": [], "category": [], "time": []}
 
         # Initialize API settings with values from .env
-        self.api_settings = {
-            "url": DEFAULT_API_URL,
-            "username": DEFAULT_API_USERNAME,
-            "password": DEFAULT_API_PASSWORD,
-            "organization": DEFAULT_API_ORG
-        }
+        from gui.api_gui import get_default_api_settings
+        self.api_settings = get_default_api_settings()
 
         self.setup_ui()
 
@@ -232,22 +229,22 @@ class FortiEDRAPIView:
             ctk.CTkLabel(self.inner_frame, text="API URL", font=("Arial", 11, "bold"), text_color="white").pack(anchor="w", padx=10)
             self.url_entry = ctk.CTkEntry(self.inner_frame, width=entry_width)
             self.url_entry.pack(pady=(0, 10), anchor="w", padx=10)
-            self.url_entry.insert(0, DEFAULT_API_URL)
+            self.url_entry.insert(0, self.api_settings.get("url", ""))
 
             ctk.CTkLabel(self.inner_frame, text="Username", font=("Arial", 11, "bold"), text_color="white").pack(anchor="w", padx=10)
             self.username_entry = ctk.CTkEntry(self.inner_frame, width=entry_width)
             self.username_entry.pack(pady=(0, 10), anchor="w", padx=10)
-            self.username_entry.insert(0, DEFAULT_API_USERNAME)
+            self.username_entry.insert(0, self.api_settings.get("username", ""))
 
             ctk.CTkLabel(self.inner_frame, text="Password", font=("Arial", 11, "bold"), text_color="white").pack(anchor="w", padx=10)
             self.password_entry = ctk.CTkEntry(self.inner_frame, width=entry_width, show="*")
             self.password_entry.pack(pady=(0, 10), anchor="w", padx=10)
-            self.password_entry.insert(0, DEFAULT_API_PASSWORD)
+            self.password_entry.insert(0, self.api_settings.get("password", ""))
 
             ctk.CTkLabel(self.inner_frame, text="Organization", font=("Arial", 11, "bold"), text_color="white").pack(anchor="w", padx=10)
             self.org_entry = ctk.CTkEntry(self.inner_frame, width=entry_width)
             self.org_entry.pack(pady=(0, 10), anchor="w", padx=10)
-            self.org_entry.insert(0, DEFAULT_API_ORG)
+            self.org_entry.insert(0, self.api_settings.get("organization", ""))
 
             # Buttons
             btn_frame = ctk.CTkFrame(self.inner_frame, fg_color="transparent")
@@ -561,4 +558,5 @@ class FortiEDRAPIView:
        
     def clear_results(self):
         self.result_box.delete("0.0", "end")
+
 

@@ -5,16 +5,39 @@ import os
 import sys
 import socket
 import threading
+from dotenv import load_dotenv
 
 from gui.mitre_gui import MitreView
 from gui.malware_gui import MalwareBazaarView
 from gui.api_gui import FortiEDRAPIView
 from backend.diagnostics import run_all_diagnostics
 from backend.FortiEDRAvScanner import run_av_scan
+from utils import resource_path
+
+
+# Debug .env path
+env_path = resource_path('.env')
+print(f"[DEBUG] Looking for .env at: {env_path}")
+
+if os.path.exists(env_path):
+    print("[DEBUG] .env file exists.")
+else:
+    print("[DEBUG] .env file NOT found.")
+
+# Now load it
+load_result = load_dotenv(env_path)
+print(f"[DEBUG] .env loaded: {load_result}")
+
+# Check a key
+print(f"[DEBUG] API_URL = {os.getenv('API_URL')}")
+
 
 # Always start in dark mode
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("dark-blue")
+
+# Load environment variables from .env file
+load_dotenv(resource_path('.env'))
 
 class FortiEDRDemoTool(ctk.CTk):
     def __init__(self):
@@ -23,11 +46,6 @@ class FortiEDRDemoTool(ctk.CTk):
         self.attributes("-fullscreen", True)
         self.bind("<Escape>", lambda e: self.attributes("-fullscreen", False))
         
-        def resource_path(relative_path):
-            """ Get absolute path to resource, works for dev and for PyInstaller """
-            if hasattr(sys, '_MEIPASS'):
-                return os.path.join(sys._MEIPASS, relative_path)
-            return os.path.join(os.path.abspath("."), relative_path)
         self.iconbitmap(resource_path(os.path.join("assets", "fortinet.ico")))
 
         # Configure main grid

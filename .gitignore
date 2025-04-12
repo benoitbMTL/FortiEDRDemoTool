@@ -30,4 +30,4 @@ Thumbs.db
 # Dossiers PyInstaller / dist
 build/
 dist/
-*.spec
+

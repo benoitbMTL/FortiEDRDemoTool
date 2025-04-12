@@ -3,10 +3,8 @@ import json
 import pandas as pd
 from datetime import datetime, timedelta
 from tabulate import tabulate
-from dotenv import load_dotenv
 import fortiedr
-
-load_dotenv()
+from utils import resource_path
 
 DEFAULT_API_URL = os.getenv("API_URL") or ""
 DEFAULT_API_USERNAME = os.getenv("API_USERNAME") or ""
