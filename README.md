@@ -5,7 +5,7 @@ This project helps visualize **MITRE techniques**, simulate **malware analysis**
 
 ---
 
-## 🎬 Demo Video (coming soon)
+## 🎬 Demo Video (coming very soon)
 
 ---
 
@@ -17,7 +17,7 @@ Before running the app, create a `.env` file in the root directory with the foll
 API_URL=https://fortiedr-host.example.com
 API_USERNAME=username
 API_PASSWORD=password
-API_ORG=organization # Case sensitive
+API_ORG=MyOrganization # Case sensitive
 ```
 
 This file is required to authenticate with the FortiEDR API.
@@ -29,8 +29,8 @@ This file is required to authenticate with the FortiEDR API.
 1. Clone the repository:
 
 ```bash
-git clone https://github.com/benoitbMTL/fortiedr-demo-gui.git
-cd fortiedr-demo-gui
+git clone https://github.com/benoitbMTL/FortiEDRDemoTool.git
+cd FortiEDRDemoTool
 ```
 
 2. (Optional) Create a virtual environment:
