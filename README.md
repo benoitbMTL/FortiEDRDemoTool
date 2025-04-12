@@ -5,15 +5,19 @@ This project helps visualize **MITRE techniques**, simulate **malware analysis**
 
 ---
 
+## 🎬 Demo Video (coming soon)
+
+---
+
 ## 🧪 Requirements
 
 Before running the app, create a `.env` file in the root directory with the following content:
 
 ```
-API_URL=https://example.com
+API_URL=https://fortiedr-host.example.com
 API_USERNAME=username
 API_PASSWORD=password
-API_ORG=organization
+API_ORG=organization # Case sensitive
 ```
 
 This file is required to authenticate with the FortiEDR API.
@@ -67,8 +71,3 @@ installer.bat
 ```
 
 The `FortiEDRDemoTool.exe` file will be generated and automatically copied to your Desktop.
-
----
-
-## 🎬 Demo Video (coming soon)
-
