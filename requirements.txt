@@ -1,4 +1,9 @@
 customtkinter
-python-dotenv
 pillow
+python-dotenv
+pandas
+tabulate
 fortiedr
+requests
+pyzipper
+CTkSpinbox
