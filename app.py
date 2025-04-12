@@ -3,10 +3,14 @@ import customtkinter as ctk
 from PIL import Image, ImageTk
 import os
 import sys
+import socket
+import threading
 
 from gui.mitre_gui import MitreView
 from gui.malware_gui import MalwareBazaarView
 from gui.api_gui import FortiEDRAPIView
+from backend.diagnostics import run_all_diagnostics
+from backend.FortiEDRAvScanner import run_av_scan
 
 # Always start in dark mode
 ctk.set_appearance_mode("dark")
@@ -70,13 +74,52 @@ class FortiEDRDemoTool(ctk.CTk):
         self.nav_frame.grid_rowconfigure(4, weight=1)
 
         # Bottom buttons
-        self.fullscreen_btn = create_nav_button(self.nav_frame, "Full Screen", self.toggle_fullscreen)
-        self.fullscreen_btn.grid(row=5, column=0, pady=5, padx=10, sticky="ew")
-        self.fullscreen_btn.configure(fg_color="#4c566a", hover_color="#4c566a")
 
+        # Host Info Frame (row 5)
+        host_info_frame = ctk.CTkFrame(
+            self.nav_frame,
+            fg_color="transparent",  # plus de fond coloré
+            border_color="white",    # contour blanc
+            border_width=1,
+            corner_radius=0          # coins droits
+        )
+        host_info_frame.grid(row=5, column=0, padx=10, pady=(5, 5), sticky="ew")
+
+        local_hostname = socket.gethostname()
+        try:
+            ip_address = socket.gethostbyname(local_hostname)
+        except Exception:
+            ip_address = "Unavailable"
+
+        host_info_text = f"Host: {local_hostname}\nIP: {ip_address}"
+        self.hostinfo_label = ctk.CTkLabel(
+            host_info_frame,
+            text=host_info_text,
+            text_color="white",
+            font=("Courier New", 12, "bold"),
+            justify="center"
+        )
+        self.hostinfo_label.pack(pady=5)
+
+        # AV Scanner Button
+        self.av_btn = create_nav_button(self.nav_frame, "AV Scanner", lambda: self.show_av_scanner())
+        self.av_btn.configure(fg_color="#006400", hover_color="#228B22")
+        self.av_btn.grid(row=6, column=0, pady=5, padx=10, sticky="ew")
+
+        # Health Check Button
+        self.diagnostic_btn = create_nav_button(self.nav_frame, "Health Check", lambda: self.show_diagnostics())
+        self.diagnostic_btn.configure(fg_color="#228B22", hover_color="#32CD32")
+        self.diagnostic_btn.grid(row=7, column=0, pady=5, padx=10, sticky="ew")
+                
+        # Full Screen Button
+        self.fullscreen_btn = create_nav_button(self.nav_frame, "Full Screen", self.toggle_fullscreen)
+        self.fullscreen_btn.configure(fg_color="#4c566a", hover_color="#5e6a7a")
+        self.fullscreen_btn.grid(row=8, column=0, pady=5, padx=10, sticky="ew")
+
+        # Quit Button
         self.quit_btn = create_nav_button(self.nav_frame, "Quit", self.quit)
         self.quit_btn.configure(fg_color="#cc0000", hover_color="#ff3333")
-        self.quit_btn.grid(row=6, column=0, pady=(5, 20), padx=10, sticky="ew")
+        self.quit_btn.grid(row=9, column=0, pady=(5, 20), padx=10, sticky="ew")
 
         # PanedWindow for Options and Results (grid inside column 1)
         self.paned_window = tk.PanedWindow(self, orient="horizontal", sashrelief="raised", sashwidth=8, bg="#1f1f1f")
@@ -108,6 +151,8 @@ class FortiEDRDemoTool(ctk.CTk):
         else:
             self.fullscreen_btn.configure(fg_color="#1f1f1f", hover_color="#333333")
 
+    def run_diagnostics(self):
+        run_all_diagnostics()
 
     def show_mitre(self):
         self.clear_frames()
@@ -120,6 +165,36 @@ class FortiEDRDemoTool(ctk.CTk):
     def show_api(self):
         self.clear_frames()
         self.api_view = FortiEDRAPIView(self.options_frame, self.results_frame)
+
+    def show_diagnostics(self):
+        for widget in self.results_frame.winfo_children():
+            widget.destroy()
+
+        self.result_box = ctk.CTkTextbox(self.results_frame, font=("Courier New", 13))
+        self.result_box.pack(expand=True, fill="both", padx=10, pady=10)
+        
+        self.result_box.tag_config("orange", foreground="#FFA500")
+        self.result_box.tag_config("red", foreground="red")
+        self.result_box.tag_config("green", foreground="#00FF00")
+        self.result_box.tag_config("title", foreground="white")
+
+        # Lancer le diagnostic dans un thread pour ne pas bloquer l'UI
+        threading.Thread(target=lambda: run_all_diagnostics(self.result_box)).start()
+
+    def show_av_scanner(self):
+        for widget in self.results_frame.winfo_children():
+            widget.destroy()
+
+        self.result_box = ctk.CTkTextbox(self.results_frame, font=("Courier New", 13))
+        self.result_box.pack(expand=True, fill="both", padx=10, pady=10)
+
+        self.result_box.tag_config("orange", foreground="#FFA500")
+        self.result_box.tag_config("red", foreground="red")
+        self.result_box.tag_config("green", foreground="#00FF00")
+        self.result_box.tag_config("white", foreground="#ffffff")
+
+        from backend.FortiEDRAvScanner import run_av_scan
+        run_av_scan(self.result_box)
 
 if __name__ == "__main__":
     app = FortiEDRDemoTool()

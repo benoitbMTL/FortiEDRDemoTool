@@ -2,6 +2,7 @@ import customtkinter as ctk
 import tkinter as tk
 from dotenv import load_dotenv
 import os
+import json
 from backend.api_backend import run_event_query, run_threat_query, test_api_authentication
 
 load_dotenv()
@@ -33,6 +34,14 @@ class FortiEDRAPIView:
 
         self.ev_buttons = {"format": [], "items": [], "action": [], "time": []}
         self.th_buttons = {"format": [], "items": [], "category": [], "time": []}
+
+        # Initialize API settings with values from .env
+        self.api_settings = {
+            "url": DEFAULT_API_URL,
+            "username": DEFAULT_API_USERNAME,
+            "password": DEFAULT_API_PASSWORD,
+            "organization": DEFAULT_API_ORG
+        }
 
         self.setup_ui()
 
@@ -75,9 +84,9 @@ class FortiEDRAPIView:
 
         self.test_btn = ctk.CTkButton(self.bottom_frame, text="Test", command=self.test_api, width=100)
         
-        self.result_box = ctk.CTkTextbox(self.results_frame, font=("Courier", 12))
+        self.result_box = ctk.CTkTextbox(self.results_frame, font=("Courier New", 13))
         self.result_box.pack(expand=True, fill="both", padx=10, pady=10)
-        self.result_box.insert("0.0", "Waiting for API query...\n\nResults will appear here once you click Search.")
+        # self.result_box.insert("0.0", "Waiting for API query...\n\nResults will appear here once you click Search.")
         self.result_box.tag_config("recap", foreground="#FFA500")
 
         self.switch_mode("Events")
@@ -240,18 +249,68 @@ class FortiEDRAPIView:
             self.org_entry.pack(pady=(0, 10), anchor="w", padx=10)
             self.org_entry.insert(0, DEFAULT_API_ORG)
 
-            # Right-aligned Test button
+            # Buttons
             btn_frame = ctk.CTkFrame(self.inner_frame, fg_color="transparent")
             btn_frame.pack(fill="x", pady=(10, 10), padx=10)
-            
+
             self.test_btn = ctk.CTkButton(btn_frame, text="Test", command=self.test_api, width=100)
             self.test_btn.pack(side="right", padx=(5, 0))
 
-            self.clear_button.pack_forget()  
-            clear_btn_settings = ctk.CTkButton(btn_frame, text="Clear", command=self.clear_results, width=100,
-                                            fg_color="#2e2e2e", hover_color="#444444", text_color="white")
-            clear_btn_settings.pack(side="right", padx=(5, 0))
+            self.reset_btn = ctk.CTkButton(
+                btn_frame, text="Reset to Default", command=self.reset_to_default,
+                width=140, fg_color="#2e2e2e", hover_color="#444444", text_color="white"
+            )
+            self.reset_btn.pack(side="right", padx=(5, 0))
 
+            clear_btn_settings = ctk.CTkButton(btn_frame, text="Clear", command=self.clear_results, width=100,
+                                               fg_color="#2e2e2e", hover_color="#444444", text_color="white")
+            clear_btn_settings.pack(side="right", padx=(5, 0))
+    
+    def reset_to_default(self):
+        load_dotenv()
+        self.url_entry.delete(0, "end")
+        self.username_entry.delete(0, "end")
+        self.password_entry.delete(0, "end")
+        self.org_entry.delete(0, "end")
+
+        self.url_entry.insert(0, os.getenv("API_URL") or "")
+        self.username_entry.insert(0, os.getenv("API_USERNAME") or "")
+        self.password_entry.insert(0, os.getenv("API_PASSWORD") or "")
+        self.org_entry.insert(0, os.getenv("API_ORG") or "")
+
+        self.result_box.delete("0.0", "end")
+        self.result_box.insert("0.0", "API settings reset to default values.\n")
+        self.result_box.tag_config("success", foreground="#00FF00")
+        self.result_box.tag_add("success", "1.0", "2.0")
+            
+    def save_api_settings(self):
+        # Save current entries to memory
+        self.api_settings = {
+            "url": self.url_entry.get(),
+            "username": self.username_entry.get(),
+            "password": self.password_entry.get(),
+            "organization": self.org_entry.get()
+        }
+
+        self.result_box.delete("0.0", "end")
+        self.result_box.insert("0.0", "API settings updated:\n\n")
+
+        text = (
+            f'URL: {self.api_settings["url"]}\n'
+            f'Username: {self.api_settings["username"]}\n'
+            f'Password: {"*" * len(self.api_settings["password"])}\n'
+            f'Organization: {self.api_settings["organization"]}\n'
+        )
+        recap_start = self.result_box.index("end-1c")
+        self.result_box.insert("end", text)
+
+        self.result_box.tag_config("field", foreground="#FFA500")
+        for field in ["URL", "Username", "Password", "Organization"]:
+            self.highlight_word(recap_start, field, "field")
+
+        self.result_box.tag_config("success", foreground="#00FF00")
+        self.result_box.tag_add("success", "1.0", "2.0")
+            
     def execute(self):
         self.result_box.delete("0.0", "end")
 
@@ -344,10 +403,140 @@ class FortiEDRAPIView:
             else:
                 self.result_box.tag_add("number", value_index, f"{value_index}+{len(value)+1}c")
 
+    # JSON FORMAT
+    # def test_api(self):
+    #     from backend.api_backend import test_api_authentication
+
+    #     self.result_box.delete("0.0", "end")
+
+    #     result = test_api_authentication(
+    #         url=self.api_settings["url"],
+    #         username=self.api_settings["username"],
+    #         password=self.api_settings["password"],
+    #         organization=self.api_settings["organization"]
+    #     )
+
+    #     if isinstance(result, dict) and result.get("status"):
+    #         self.result_box.insert("0.0", "Authentication successful!\n\n")
+    #         self.result_box.tag_config("success", foreground="#00FF00")
+    #         self.result_box.tag_add("success", "1.0", "2.0")
+
+    #         recap = (
+    #             f'URL: {self.api_settings["url"]}\n'
+    #             f'Username: {self.api_settings["username"]}\n'
+    #             f'Organization: {self.api_settings["organization"]}\n\n'
+    #         )
+    #         recap_start = self.result_box.index("end-1c")
+    #         self.result_box.insert("end", recap)
+    #         self.result_box.tag_config("field", foreground="#FFA500")
+    #         for field in ["URL", "Username", "Organization"]:
+    #             self.highlight_word(recap_start, field, "field")
+
+    #         self.highlight_json(json.dumps(result["data"], indent=2))
+
+    #     else:
+    #         self.result_box.insert("0.0", f"Authentication failed.\n\n{result.get('data', 'Unknown error')}")
+    #         self.result_box.tag_config("error", foreground="#FF4444")
+    #         self.result_box.tag_add("error", "1.0", "3.0")
+    
     def test_api(self):
-        result = test_api_authentication()
+        from backend.api_backend import test_api_authentication
+
+        # Clear previous result
         self.result_box.delete("0.0", "end")
-        self.result_box.insert("0.0", result)
+
+        # Get current values from form fields
+        url = self.url_entry.get()
+        username = self.username_entry.get()
+        password = self.password_entry.get()
+        organization = self.org_entry.get()
+
+        result = test_api_authentication(url, username, password, organization)
+
+        if isinstance(result, dict) and result.get("status"):
+            # Authentication success message
+            self.result_box.insert("end", "Authentication successful\n\n", "success")
+            self.result_box.tag_config("success", foreground="#00FF00")
+
+            # Recap fields
+            recap_text = (
+                f"URL: {url}\n"
+                f"Username: {username}\n"
+                f"Organization: {organization}\n\n"
+            )
+            start = self.result_box.index("end-1c")
+            self.result_box.insert("end", recap_text)
+            self.result_box.tag_config("field", foreground="#FFA500")
+            for word in ["URL", "Username", "Organization"]:
+                self.highlight_word(start, word, "field")
+
+            # Display system info summary
+            self.display_system_summary(result["data"])
+
+        else:
+            self.result_box.insert("0.0", f"Authentication failed.\n\n{result.get('data', 'Unknown error')}")
+            self.result_box.tag_config("error", foreground="#FF4444")
+            self.result_box.tag_add("error", "1.0", "3.0")
+
+    def display_system_summary(self, data):
+        lines = []
+        lines.append("System Summary\n==============\n")
+
+        lines.append(f"License Expiration: {data.get('licenseExpirationDate', 'N/A')}")
+        lines.append(f"Endpoints Capacity: {data.get('endpointsLicenseCapacity', 'N/A')}")
+        lines.append(f"Registered Collectors: {data.get('registeredCollectors', 'N/A')}")
+        lines.append(f"Mobile In Use: {data.get('mobileInUse', 'N/A')}\n")
+
+        lines.append("License Features:")
+        for feature in data.get("licenseFeatures", []):
+            lines.append(f"  - {feature}")
+        lines.append("")
+
+        lines.append("Collectors State:")
+        for k, v in data.get("collectorsState", {}).items():
+            lines.append(f"  {k}: {v}")
+        lines.append("")
+
+        lines.append(f"Management Version: {data.get('managementVersion', 'N/A')}")
+        lines.append(f"Content Version: {data.get('contentVersion', 'N/A')}\n")
+
+        lines.append("Collector Versions:")
+        for version in data.get("collectorVersionsV2", []):
+            lines.append(f"  {version['version']} (x{version['count']})")
+        lines.append("")
+
+        lines.append("Cores:")
+        for core in data.get("cores", []):
+            lines.append(f"  {core['name']} - Version: {core['version']}")
+        lines.append("")
+
+        lines.append("Aggregators:")
+        for aggr in data.get("aggregators", []):
+            lines.append(f"  {aggr['name']} - Version: {aggr['version'].strip()}")
+        lines.append("")
+
+        lines.append("Repositories:")
+        for repo in data.get("repositories", []):
+            lines.append(f"  {repo['address']} - Status: {repo['status']}")
+
+        start = self.result_box.index("end-1c")
+        self.result_box.insert("end", "\n".join(lines))
+
+        # Color sections
+        self.highlight_word(start, "System Summary", "recap")
+        self.highlight_word(start, "License Features:", "field")
+        self.highlight_word(start, "Collectors State:", "field")
+        self.highlight_word(start, "Collector Versions:", "field")
+        self.highlight_word(start, "Cores:", "field")
+        self.highlight_word(start, "Aggregators:", "field")
+        self.highlight_word(start, "Repositories:", "field")
+
+    def highlight_word(self, start, word, tag):
+        index = self.result_box.search(word, start, stopindex="end")
+        while index:
+            end_index = f"{index}+{len(word)}c"
+            self.result_box.tag_add(tag, index, end_index)
+            index = self.result_box.search(word, end_index, stopindex="end")
 
     def set_var(self, key, value, mode_prefix):
         # Set selected value
@@ -369,14 +558,7 @@ class FortiEDRAPIView:
                     btn.configure(fg_color="#2e2e2e", hover_color="#444444")
             except tk.TclError:
                 continue
-
-
-    def test_api(self):
-        result = "API test successful.\n\nURL: {}\nUser: {}\nOrg: {}".format(
-            DEFAULT_API_URL, DEFAULT_API_USERNAME, DEFAULT_API_ORG
-        )
-        self.result_box.delete("0.0", "end")
-        self.result_box.insert("0.0", result)
-        
+       
     def clear_results(self):
         self.result_box.delete("0.0", "end")
+

@@ -8,15 +8,41 @@ import fortiedr
 
 load_dotenv()
 
-def test_api_authentication():
-    """Test connection to FortiEDR API using environment variables."""
-    auth = fortiedr.auth(
-        user=os.getenv("API_USERNAME"),
-        passw=os.getenv("API_PASSWORD"),
-        host=os.getenv("API_URL"),
-        org=os.getenv("API_ORG")
-    )
-    return auth['status'], auth['data']
+DEFAULT_API_URL = os.getenv("API_URL") or ""
+DEFAULT_API_USERNAME = os.getenv("API_USERNAME") or ""
+DEFAULT_API_PASSWORD = os.getenv("API_PASSWORD") or ""
+DEFAULT_API_ORG = os.getenv("API_ORG") or ""
+
+def test_api_authentication(url, username, password, organization):
+    try:
+        authentication = fortiedr.auth(
+            user=username,
+            passw=password,
+            host=url.replace("https://", "").split("/")[0],
+            org=organization
+        )
+
+        if not authentication["status"]:
+            return {"status": False, "data": authentication["data"]}
+
+        admin = fortiedr.Administrator()
+        system_info = admin.list_system_summary(organization=organization)
+
+        return {
+            "status": True,
+            "data": system_info["data"]
+        }
+
+    except Exception as e:
+        return {"status": False, "data": str(e)}
+
+def save_api_settings(self):
+    self.api_settings = {
+        "url": self.url_entry.get(),
+        "username": self.username_entry.get(),
+        "password": self.password_entry.get(),
+        "organization": self.org_entry.get()
+    }
 
 def run_event_query(output_format="Table", items="1", action="All", time_range="1 hour"):
     auth = fortiedr.auth(
