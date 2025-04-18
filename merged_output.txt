@@ -1,0 +1,1835 @@
+Merged Python Files
+====================
+Directory structure:
+/
+    .env
+    .gitignore
+    app.py
+    build-fortiedr.ps1
+    FortiEDRDemoTool.spec
+    install-atomicredteam.ps1
+    install-latest-powershell.ps1
+    install-latest-python.ps1
+    README.md
+    requirements.txt
+    run.bat
+    utils.py
+assets/
+    fortinet-logo-white.png
+    fortinet.ico
+backend/
+    api_backend.py
+    diagnostics.py
+    FortiEDRAvScanner.py
+    Fortinet_CA_SSL.cer
+    malware_backend.py
+    mitre_backend.py
+    __init__.py
+    __pycache__/
+        api_backend.cpython-313.pyc
+        connectivity_checks.cpython-313.pyc
+        diagnostics.cpython-313.pyc
+        FortiEDRAvScanner.cpython-313.pyc
+        malware_backend.cpython-313.pyc
+        mitre_backend.cpython-313.pyc
+        __init__.cpython-313.pyc
+build/
+    FortiEDRDemoTool/
+        Analysis-00.toc
+        base_library.zip
+        EXE-00.toc
+        FortiEDRDemoTool.pkg
+        PKG-00.toc
+        PYZ-00.pyz
+        PYZ-00.toc
+        warn-FortiEDRDemoTool.txt
+        xref-FortiEDRDemoTool.html
+        localpycs/
+            pyimod01_archive.pyc
+            pyimod02_importers.pyc
+            pyimod03_ctypes.pyc
+            pyimod04_pywin32.pyc
+            struct.pyc
+data/
+    tests.py
+    __init__.py
+    __pycache__/
+        tests.cpython-313.pyc
+        __init__.cpython-313.pyc
+dist/
+gui/
+    api_gui.py
+    malware_gui.py
+    mitre_gui.py
+    widgets.py
+    __init__.py
+    __pycache__/
+        api_gui.cpython-313.pyc
+        malware_gui.cpython-313.pyc
+        mitre_gui.cpython-313.pyc
+        __init__.cpython-313.pyc
+__pycache__/
+    utils.cpython-313.pyc
+
+Selected Python files:
+ - app.py
+ - utils.py
+ - gui\api_gui.py
+ - gui\malware_gui.py
+ - gui\mitre_gui.py
+ - gui\widgets.py
+ - gui\__init__.py
+ - backend\api_backend.py
+ - backend\diagnostics.py
+ - backend\FortiEDRAvScanner.py
+ - backend\malware_backend.py
+ - backend\mitre_backend.py
+ - backend\__init__.py
+
+=================
+app.py
+=================
+import tkinter as tk
+import customtkinter as ctk
+from PIL import Image, ImageTk
+import os
+import sys
+import socket
+import threading
+from dotenv import load_dotenv
+
+from gui.mitre_gui import MitreView
+from gui.malware_gui import MalwareBazaarView
+from gui.api_gui import FortiEDRAPIView
+from backend.diagnostics import run_all_diagnostics
+from backend.FortiEDRAvScanner import run_av_scan
+from utils import resource_path
+
+
+# Debug .env path
+# env_path = resource_path('.env')
+# print(f"[DEBUG] Looking for .env at: {env_path}")
+
+# if os.path.exists(env_path):
+#     print("[DEBUG] .env file exists.")
+# else:
+#     print("[DEBUG] .env file NOT found.")
+
+# # Now load it
+# load_result = load_dotenv(env_path)
+# print(f"[DEBUG] .env loaded: {load_result}")
+
+# # Check a key
+# print(f"[DEBUG] API_URL = {os.getenv('API_URL')}")
+
+# Always start in dark mode
+ctk.set_appearance_mode("dark")
+ctk.set_default_color_theme("dark-blue")
+
+# Load environment variables from .env file
+load_dotenv(resource_path('.env'))
+
+class FortiEDRDemoTool(ctk.CTk):
+    def __init__(self):
+        super().__init__()
+        self.title("FortiEDR Demo Tool")
+        self.attributes("-fullscreen", True)
+        self.bind("<Escape>", lambda e: self.attributes("-fullscreen", False))
+        
+        self.iconbitmap(resource_path(os.path.join("assets", "fortinet.ico")))
+
+        # Configure main grid
+        self.grid_rowconfigure(0, weight=1)
+        self.grid_columnconfigure(0, weight=0)  # Sidebar
+        self.grid_columnconfigure(1, weight=1)  # Options + Results
+
+        # Left Navigation Menu
+        self.nav_frame = ctk.CTkFrame(self, width=120, fg_color="#2a2a2a")
+        self.nav_frame.grid(row=0, column=0, sticky="ns")
+
+        # Load logo
+        logo_path = resource_path(os.path.join("assets", "fortinet-logo-white.png"))
+        logo = Image.open(logo_path)
+        w_percent = 130 / float(logo.size[0])
+        h_size = int(float(logo.size[1]) * w_percent)
+        logo_img = logo.resize((130, h_size), Image.Resampling.LANCZOS)
+        self.logo = ImageTk.PhotoImage(logo_img)
+        self.logo_label = tk.Label(self.nav_frame, image=self.logo, bg="#2a2a2a")
+        self.logo_label.grid(row=0, column=0, pady=(15, 5))
+
+        def create_nav_button(parent, text, command):
+            btn = ctk.CTkButton(parent, text=text, command=command, fg_color="#2e2e2e", hover_color="#444444", text_color="white", corner_radius=6, font=("Arial", 12, "bold"))
+            return btn
+
+        self.active_nav = None
+
+        def set_active_nav(btn):
+            if self.active_nav:
+                self.active_nav.configure(fg_color="#2e2e2e", hover_color="#444444")
+            btn.configure(fg_color="#FFA500", hover_color="#FFA500")
+            self.active_nav = btn
+
+        # Top buttons
+        self.btn_mitre = create_nav_button(self.nav_frame, "MITRE", lambda: [self.show_mitre(), set_active_nav(self.btn_mitre)])
+        self.btn_mitre.grid(row=1, column=0, pady=(10, 5), padx=10, sticky="ew")
+
+        self.btn_malwarebazaar = create_nav_button(self.nav_frame, "Malware Bazaar", lambda: [self.show_malwarebazaar(), set_active_nav(self.btn_malwarebazaar)])
+        self.btn_malwarebazaar.grid(row=2, column=0, pady=5, padx=10, sticky="ew")
+
+        self.btn_api = create_nav_button(self.nav_frame, "FortiEDR API", lambda: [self.show_api(), set_active_nav(self.btn_api)])
+        self.btn_api.grid(row=3, column=0, pady=5, padx=10, sticky="ew")
+
+        self.nav_frame.grid_rowconfigure(4, weight=1)
+
+        # Bottom buttons
+
+        # Host Info Frame (row 5)
+        host_info_frame = ctk.CTkFrame(
+            self.nav_frame,
+            fg_color="transparent",  # plus de fond coloré
+            border_color="white",    # contour blanc
+            border_width=1,
+            corner_radius=0          # coins droits
+        )
+        host_info_frame.grid(row=5, column=0, padx=10, pady=(5, 5), sticky="ew")
+
+        local_hostname = socket.gethostname()
+        try:
+            ip_address = socket.gethostbyname(local_hostname)
+        except Exception:
+            ip_address = "Unavailable"
+
+        host_info_text = f"Host: {local_hostname}\nIP: {ip_address}"
+        self.hostinfo_label = ctk.CTkLabel(
+            host_info_frame,
+            text=host_info_text,
+            text_color="white",
+            font=("Courier New", 12, "bold"),
+            justify="center"
+        )
+        self.hostinfo_label.pack(pady=5)
+
+        # AV Scanner Button
+        self.av_btn = create_nav_button(self.nav_frame, "AV Scanner", lambda: self.show_av_scanner())
+        self.av_btn.configure(fg_color="#006400", hover_color="#228B22")
+        self.av_btn.grid(row=6, column=0, pady=5, padx=10, sticky="ew")
+
+        # Health Check Button
+        self.diagnostic_btn = create_nav_button(self.nav_frame, "Health Check", lambda: self.show_diagnostics())
+        self.diagnostic_btn.configure(fg_color="#228B22", hover_color="#32CD32")
+        self.diagnostic_btn.grid(row=7, column=0, pady=5, padx=10, sticky="ew")
+                
+        # Full Screen Button
+        self.fullscreen_btn = create_nav_button(self.nav_frame, "Full Screen", self.toggle_fullscreen)
+        self.fullscreen_btn.configure(fg_color="#4c566a", hover_color="#5e6a7a")
+        self.fullscreen_btn.grid(row=8, column=0, pady=5, padx=10, sticky="ew")
+
+        # Quit Button
+        self.quit_btn = create_nav_button(self.nav_frame, "Quit", self.quit)
+        self.quit_btn.configure(fg_color="#cc0000", hover_color="#ff3333")
+        self.quit_btn.grid(row=9, column=0, pady=(5, 20), padx=10, sticky="ew")
+
+        # PanedWindow for Options and Results (grid inside column 1)
+        self.paned_window = tk.PanedWindow(self, orient="horizontal", sashrelief="raised", sashwidth=8, bg="#1f1f1f")
+        self.paned_window.grid(row=0, column=1, sticky="nsew")
+
+        self.options_frame = ctk.CTkFrame(self.paned_window)
+        self.results_frame = ctk.CTkFrame(self.paned_window)
+        self.paned_window.add(self.options_frame, minsize=300)
+        self.paned_window.add(self.results_frame)
+
+        self.mitre_view = MitreView(self.options_frame, self.results_frame)
+        self.malware_view = MalwareBazaarView(self.options_frame, self.results_frame)
+        self.api_view = FortiEDRAPIView(self.options_frame, self.results_frame)
+
+        self.show_mitre()
+        set_active_nav(self.btn_mitre)
+
+    def clear_frames(self):
+        for widget in self.options_frame.winfo_children():
+            widget.destroy()
+        for widget in self.results_frame.winfo_children():
+            widget.destroy()
+
+    def toggle_fullscreen(self):
+        current_state = self.attributes("-fullscreen")
+        self.attributes("-fullscreen", not current_state)
+        if not current_state:
+            self.fullscreen_btn.configure(fg_color="#4c566a", hover_color="#4c566a")
+        else:
+            self.fullscreen_btn.configure(fg_color="#1f1f1f", hover_color="#333333")
+
+    def run_diagnostics(self):
+        run_all_diagnostics()
+
+    def show_mitre(self):
+        self.clear_frames()
+        self.mitre_view = MitreView(self.options_frame, self.results_frame)
+
+    def show_malwarebazaar(self):
+        self.clear_frames()
+        self.malware_view = MalwareBazaarView(self.options_frame, self.results_frame)
+
+    def show_api(self):
+        self.clear_frames()
+        self.api_view = FortiEDRAPIView(self.options_frame, self.results_frame)
+
+    def show_diagnostics(self):
+        for widget in self.results_frame.winfo_children():
+            widget.destroy()
+
+        self.result_box = ctk.CTkTextbox(self.results_frame, font=("Courier New", 13))
+        self.result_box.pack(expand=True, fill="both", padx=10, pady=10)
+        
+        self.result_box.tag_config("orange", foreground="#FFA500")
+        self.result_box.tag_config("red", foreground="red")
+        self.result_box.tag_config("green", foreground="#00FF00")
+        self.result_box.tag_config("title", foreground="white")
+
+        # Lancer le diagnostic dans un thread pour ne pas bloquer l'UI
+        threading.Thread(target=lambda: run_all_diagnostics(self.result_box)).start()
+
+    def show_av_scanner(self):
+        for widget in self.results_frame.winfo_children():
+            widget.destroy()
+
+        self.result_box = ctk.CTkTextbox(self.results_frame, font=("Courier New", 13))
+        self.result_box.pack(expand=True, fill="both", padx=10, pady=10)
+
+        self.result_box.tag_config("orange", foreground="#FFA500")
+        self.result_box.tag_config("red", foreground="red")
+        self.result_box.tag_config("green", foreground="#00FF00")
+        self.result_box.tag_config("white", foreground="#ffffff")
+
+        from backend.FortiEDRAvScanner import run_av_scan
+        run_av_scan(self.result_box)
+
+if __name__ == "__main__":
+    app = FortiEDRDemoTool()
+    app.mainloop()
+
+=================
+utils.py
+=================
+# utils.py
+import os
+import sys
+
+def resource_path(relative_path):
+    """Get absolute path to resource, works for dev and PyInstaller"""
+    try:
+        base_path = sys._MEIPASS
+    except AttributeError:
+        base_path = os.path.abspath(".")
+
+    return os.path.join(base_path, relative_path)
+
+=================
+gui\api_gui.py
+=================
+import customtkinter as ctk
+import tkinter as tk
+from dotenv import load_dotenv
+import os
+import json
+from backend.api_backend import run_event_query, run_threat_query, test_api_authentication
+
+EVENT_FORMATS = ["Table", "JSON"]
+EVENT_ITEMS = ["1", "5", "10", "50", "No limit"]
+EVENT_ACTIONS = ["All", "Block", "SimulationBlock", "Log"]
+EVENT_TIMES = ["1 hour", "2 hours", "12 hours", "24 hours", "48 hours"]
+
+THREAT_FORMATS = ["Table", "JSON"]
+THREAT_CATEGORIES = ["All", "Process", "File", "Registry", "Network", "Log"]
+THREAT_TIMES = ["lastHour", "last12hours", "last24hours", "last7days", "last30days"]
+THREAT_ITEMS = ["1", "5", "10", "100"]
+
+def get_default_api_settings():
+    return {
+        "url": os.getenv("API_URL") or "",
+        "username": os.getenv("API_USERNAME") or "",
+        "password": os.getenv("API_PASSWORD") or "",
+        "organization": os.getenv("API_ORG") or ""
+    }
+    
+class FortiEDRAPIView:
+    def __init__(self, options_frame, results_frame):
+        self.options_frame = options_frame
+        self.results_frame = results_frame
+        self.selected_mode = "Events"
+        self.ev_vars = {}
+        self.th_vars = {}
+        self.test_btn = None
+        self.button_width = 100
+
+        self.ev_buttons = {"format": [], "items": [], "action": [], "time": []}
+        self.th_buttons = {"format": [], "items": [], "category": [], "time": []}
+
+        # Initialize API settings with values from .env
+        from gui.api_gui import get_default_api_settings
+        self.api_settings = get_default_api_settings()
+
+        self.setup_ui()
+
+    def setup_ui(self):
+        ctk.CTkLabel(self.options_frame, text="FortiEDR API", font=("Arial", 16, "bold"), text_color="#FFA500").pack(pady=(10, 5), padx=10, anchor="w")
+
+        self.api_mode = ctk.CTkSegmentedButton(
+            self.options_frame,
+            values=["Events", "Threat Hunting", "API Settings"],
+            command=self.switch_mode
+        )
+        self.api_mode.set("Events")
+        self.api_mode.pack(pady=(0, 10), padx=10, anchor="w")
+
+        canvas = tk.Canvas(self.options_frame, bg="#212121", highlightthickness=0, bd=0)
+        canvas.pack(side="top", fill="both", expand=True, padx=10)
+
+        inner_frame = ctk.CTkFrame(canvas, fg_color="transparent")
+        window_id = canvas.create_window((0, 0), window=inner_frame, anchor="nw")
+
+        def on_configure(event): canvas.configure(scrollregion=canvas.bbox("all"))
+        def resize(event): canvas.itemconfig(window_id, width=event.width)
+        inner_frame.bind("<Configure>", on_configure)
+        canvas.bind("<Configure>", resize)
+
+        def _on_mousewheel(event):
+            canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+        canvas.bind("<Enter>", lambda e: canvas.bind_all("<MouseWheel>", _on_mousewheel))
+        canvas.bind("<Leave>", lambda e: canvas.unbind_all("<MouseWheel>"))
+
+        self.inner_frame = inner_frame
+
+        self.bottom_frame = ctk.CTkFrame(self.options_frame, fg_color="transparent")
+        self.bottom_frame.pack(side="bottom", fill="x", padx=10, pady=(5, 20))
+
+        self.clear_button = ctk.CTkButton(self.bottom_frame, text="Clear", command=self.clear_results, width=100,
+                                        fg_color="#2e2e2e", hover_color="#444444", text_color="white")
+
+        self.search_btn = ctk.CTkButton(self.bottom_frame, text="Search", command=self.execute, width=100)
+
+        self.test_btn = ctk.CTkButton(self.bottom_frame, text="Test", command=self.test_api, width=100)
+        
+        self.result_box = ctk.CTkTextbox(self.results_frame, font=("Courier New", 13))
+        self.result_box.pack(expand=True, fill="both", padx=10, pady=10)
+        # self.result_box.insert("0.0", "Waiting for API query...\n\nResults will appear here once you click Search.")
+        self.result_box.tag_config("recap", foreground="#FFA500")
+
+        self.switch_mode("Events")
+
+    def switch_mode(self, mode):
+        self.selected_mode = mode
+        self.build_ui(mode)
+
+    def build_ui(self, mode):
+        # Clear previous content
+        for widget in self.inner_frame.winfo_children():
+            widget.destroy()
+
+        # Always forget buttons to avoid duplicates
+        self.clear_button.pack_forget()
+        self.search_btn.pack_forget()
+        self.test_btn.pack_forget()
+
+        # === EVENTS MODE ===
+        if mode == "Events":
+            if self.test_btn:
+                self.test_btn.pack_forget()
+
+            self.ev_buttons = {"format": [], "items": [], "action": [], "time": []}
+            self.ev_vars = {"format": "Table", "items": "1", "action": "All", "time": "1 hour"}
+
+            self.search_btn.pack(in_=self.bottom_frame, side="right", padx=(5, 0))
+            self.clear_button.pack(in_=self.bottom_frame, side="right", padx=(5, 0))
+            
+            container = ctk.CTkFrame(self.inner_frame, fg_color="transparent")
+            container.pack(pady=0)
+
+            col1 = ctk.CTkFrame(container, fg_color="transparent", width=180)
+            col1.pack(side="left", padx=(0, 30), fill="y")
+
+            col2 = ctk.CTkFrame(container, fg_color="transparent", width=180)
+            col2.pack(side="left", padx=(30, 0), fill="y")
+
+            # Column 1: Format + Items
+            ctk.CTkLabel(col1, text="Format", font=("Arial", 11, "bold"), text_color="white").pack(anchor="w", pady=(10, 2))
+            for opt in EVENT_FORMATS:
+                btn = ctk.CTkButton(col1, text=opt, width=140,
+                    command=lambda v=opt: self.set_var("format", v, "ev"),
+                    fg_color="#FFA500" if opt == "Table" else "#2e2e2e",
+                    hover_color="#FFA500" if opt == "Table" else "#444444",
+                    text_color="white")
+                btn.pack(pady=2, fill="x")
+                self.ev_buttons["format"].append(btn)
+
+            ctk.CTkLabel(col1, text="Number of Events", font=("Arial", 11, "bold"), text_color="white").pack(anchor="w", pady=(15, 2))
+            for opt in EVENT_ITEMS:
+                btn = ctk.CTkButton(col1, text=opt, width=140, command=lambda v=opt: self.set_var("items", v, "ev"),
+                                    fg_color="#FFA500" if opt == "1" else "#2e2e2e",
+                                    hover_color="#FFA500" if opt == "1" else "#444444",
+                                    text_color="white")
+                btn.pack(pady=2, fill="x")
+                self.ev_buttons["items"].append(btn)
+
+            # Column 2: Action + Time
+            ctk.CTkLabel(col2, text="Action Filter", font=("Arial", 11, "bold"), text_color="white").pack(anchor="w", pady=(10, 2))
+            for opt in EVENT_ACTIONS:
+                btn = ctk.CTkButton(col2, text=opt, width=140, command=lambda v=opt: self.set_var("action", v, "ev"),
+                                    fg_color="#FFA500" if opt == "All" else "#2e2e2e",
+                                    hover_color="#FFA500" if opt == "All" else "#444444",
+                                    text_color="white")
+                btn.pack(pady=2, fill="x")
+                self.ev_buttons["action"].append(btn)
+
+            ctk.CTkLabel(col2, text="Time Range", font=("Arial", 11, "bold"), text_color="white").pack(anchor="w", pady=(15, 2))
+            for opt in EVENT_TIMES:
+                btn = ctk.CTkButton(col2, text=opt, width=140, command=lambda v=opt: self.set_var("time", v, "ev"),
+                                    fg_color="#FFA500" if opt == "1 hour" else "#2e2e2e",
+                                    hover_color="#FFA500" if opt == "1 hour" else "#444444",
+                                    text_color="white")
+                btn.pack(pady=2, fill="x")
+                self.ev_buttons["time"].append(btn)
+
+        # === THREAT HUNTING MODE ===
+        elif mode == "Threat Hunting":
+            if self.test_btn:
+                self.test_btn.pack_forget()
+
+            # Réinitialiser les boutons et les valeurs sélectionnées
+            self.th_buttons = {"format": [], "items": [], "category": [], "time": []}
+            self.th_vars = {"format": "Table", "items": "1", "category": "All", "time": "lastHour"}
+
+            self.search_btn.pack(in_=self.bottom_frame, side="right", padx=(5, 0))
+            self.clear_button.pack(in_=self.bottom_frame, side="right", padx=(5, 0))
+
+            container = ctk.CTkFrame(self.inner_frame, fg_color="transparent")
+            container.pack(pady=0)
+
+            col1 = ctk.CTkFrame(container, fg_color="transparent", width=180)
+            col1.pack(side="left", padx=(0, 30), fill="y")
+
+            col2 = ctk.CTkFrame(container, fg_color="transparent", width=180)
+            col2.pack(side="left", padx=(30, 0), fill="y")
+
+            # Column 1: Format + Items
+            ctk.CTkLabel(col1, text="Format", font=("Arial", 11, "bold"), text_color="white").pack(anchor="w", pady=(10, 2))
+            for opt in THREAT_FORMATS:
+                btn = ctk.CTkButton(col1, text=opt, width=140, command=lambda v=opt: self.set_var("format", v, "th"),
+                                    fg_color="#FFA500" if opt == "Table" else "#2e2e2e",
+                                    hover_color="#FFA500" if opt == "Table" else "#444444",
+                                    text_color="white")
+                btn.pack(pady=2, fill="x")
+                self.th_buttons["format"].append(btn)
+
+            ctk.CTkLabel(col1, text="Items", font=("Arial", 11, "bold"), text_color="white").pack(anchor="w", pady=(15, 2))
+            for opt in THREAT_ITEMS:
+                btn = ctk.CTkButton(col1, text=opt, width=140, command=lambda v=opt: self.set_var("items", v, "th"),
+                                    fg_color="#FFA500" if opt == "1" else "#2e2e2e",
+                                    hover_color="#FFA500" if opt == "1" else "#444444",
+                                    text_color="white")
+                btn.pack(pady=2, fill="x")
+                self.th_buttons["items"].append(btn)
+
+            # Column 2: Category + Time
+            ctk.CTkLabel(col2, text="Category", font=("Arial", 11, "bold"), text_color="white").pack(anchor="w", pady=(10, 2))
+            for opt in THREAT_CATEGORIES:
+                btn = ctk.CTkButton(col2, text=opt, width=140, command=lambda v=opt: self.set_var("category", v, "th"),
+                                    fg_color="#FFA500" if opt == "All" else "#2e2e2e",
+                                    hover_color="#FFA500" if opt == "All" else "#444444",
+                                    text_color="white")
+                btn.pack(pady=2, fill="x")
+                self.th_buttons["category"].append(btn)
+
+            ctk.CTkLabel(col2, text="Time Range", font=("Arial", 11, "bold"), text_color="white").pack(anchor="w", pady=(15, 2))
+            for opt in THREAT_TIMES:
+                btn = ctk.CTkButton(col2, text=opt, width=140, command=lambda v=opt: self.set_var("time", v, "th"),
+                                    fg_color="#FFA500" if opt == "lastHour" else "#2e2e2e",
+                                    hover_color="#FFA500" if opt == "lastHour" else "#444444",
+                                    text_color="white")
+                btn.pack(pady=2, fill="x")
+                self.th_buttons["time"].append(btn)
+
+        # === API SETTINGS MODE ===
+        elif mode == "API Settings":
+            self.search_btn.pack_forget()
+
+            entry_width = 360
+
+            ctk.CTkLabel(self.inner_frame, text="API URL", font=("Arial", 11, "bold"), text_color="white").pack(anchor="w", padx=10)
+            self.url_entry = ctk.CTkEntry(self.inner_frame, width=entry_width)
+            self.url_entry.pack(pady=(0, 10), anchor="w", padx=10)
+            self.url_entry.insert(0, self.api_settings.get("url", ""))
+
+            ctk.CTkLabel(self.inner_frame, text="Username", font=("Arial", 11, "bold"), text_color="white").pack(anchor="w", padx=10)
+            self.username_entry = ctk.CTkEntry(self.inner_frame, width=entry_width)
+            self.username_entry.pack(pady=(0, 10), anchor="w", padx=10)
+            self.username_entry.insert(0, self.api_settings.get("username", ""))
+
+            ctk.CTkLabel(self.inner_frame, text="Password", font=("Arial", 11, "bold"), text_color="white").pack(anchor="w", padx=10)
+            self.password_entry = ctk.CTkEntry(self.inner_frame, width=entry_width, show="*")
+            self.password_entry.pack(pady=(0, 10), anchor="w", padx=10)
+            self.password_entry.insert(0, self.api_settings.get("password", ""))
+
+            ctk.CTkLabel(self.inner_frame, text="Organization", font=("Arial", 11, "bold"), text_color="white").pack(anchor="w", padx=10)
+            self.org_entry = ctk.CTkEntry(self.inner_frame, width=entry_width)
+            self.org_entry.pack(pady=(0, 10), anchor="w", padx=10)
+            self.org_entry.insert(0, self.api_settings.get("organization", ""))
+
+            # Buttons
+            btn_frame = ctk.CTkFrame(self.inner_frame, fg_color="transparent")
+            btn_frame.pack(fill="x", pady=(10, 10), padx=10)
+
+            self.test_btn = ctk.CTkButton(btn_frame, text="Test", command=self.test_api, width=100)
+            self.test_btn.pack(side="right", padx=(5, 0))
+
+            self.reset_btn = ctk.CTkButton(
+                btn_frame, text="Reset to Default", command=self.reset_to_default,
+                width=140, fg_color="#2e2e2e", hover_color="#444444", text_color="white"
+            )
+            self.reset_btn.pack(side="right", padx=(5, 0))
+
+            clear_btn_settings = ctk.CTkButton(btn_frame, text="Clear", command=self.clear_results, width=100,
+                                               fg_color="#2e2e2e", hover_color="#444444", text_color="white")
+            clear_btn_settings.pack(side="right", padx=(5, 0))
+    
+    def reset_to_default(self):
+        load_dotenv()
+        self.url_entry.delete(0, "end")
+        self.username_entry.delete(0, "end")
+        self.password_entry.delete(0, "end")
+        self.org_entry.delete(0, "end")
+
+        self.url_entry.insert(0, os.getenv("API_URL") or "")
+        self.username_entry.insert(0, os.getenv("API_USERNAME") or "")
+        self.password_entry.insert(0, os.getenv("API_PASSWORD") or "")
+        self.org_entry.insert(0, os.getenv("API_ORG") or "")
+
+        self.result_box.delete("0.0", "end")
+        self.result_box.insert("0.0", "API settings reset to default values.\n")
+        self.result_box.tag_config("success", foreground="#00FF00")
+        self.result_box.tag_add("success", "1.0", "2.0")
+            
+    def save_api_settings(self):
+        # Save current entries to memory
+        self.api_settings = {
+            "url": self.url_entry.get(),
+            "username": self.username_entry.get(),
+            "password": self.password_entry.get(),
+            "organization": self.org_entry.get()
+        }
+
+        self.result_box.delete("0.0", "end")
+        self.result_box.insert("0.0", "API settings updated:\n\n")
+
+        text = (
+            f'URL: {self.api_settings["url"]}\n'
+            f'Username: {self.api_settings["username"]}\n'
+            f'Password: {"*" * len(self.api_settings["password"])}\n'
+            f'Organization: {self.api_settings["organization"]}\n'
+        )
+        recap_start = self.result_box.index("end-1c")
+        self.result_box.insert("end", text)
+
+        self.result_box.tag_config("field", foreground="#FFA500")
+        for field in ["URL", "Username", "Password", "Organization"]:
+            self.highlight_word(recap_start, field, "field")
+
+        self.result_box.tag_config("success", foreground="#00FF00")
+        self.result_box.tag_add("success", "1.0", "2.0")
+            
+    def execute(self):
+        self.result_box.delete("0.0", "end")
+
+        try:
+            if self.selected_mode == "Events":
+                vals = self.ev_vars
+
+                result = run_event_query(
+                    output_format=vals.get("format", "table"),
+                    items=vals.get("items", "1"),
+                    action=vals.get("action", "All"),
+                    time_range=vals.get("time", "1 hour")
+                )
+
+                recap = f"FortiEDR Events — Format: {vals.get('format')} | Time: {vals.get('time')} | Action: {vals.get('action')} | Items: {vals.get('items')}\n\n"
+
+                if vals.get("format", "Table").lower() == "json":
+                    self.result_box.insert("0.0", recap)
+                    self.result_box.tag_add("recap", "1.0", "3.0")
+                    self.highlight_json(result)
+                else:
+                    full_output = recap + result + "\n"
+                    self.result_box.insert("0.0", full_output)
+                    self.result_box.tag_add("recap", "1.0", "3.0")
+
+            elif self.selected_mode == "Threat Hunting":
+                vals = self.th_vars
+
+                result = run_threat_query(
+                    fmt=vals.get("format", "table"),
+                    items=vals.get("items", "1"),
+                    category=vals.get("category", "All"),
+                    time_range=vals.get("time", "lastHour")
+                )
+
+                recap = f"Threat Hunting — Format: {vals.get('format')} | Time: {vals.get('time')} | Category: {vals.get('category')} | Items: {vals.get('items')}\n\n"
+
+                if vals.get("format", "Table").lower() == "json":
+                    self.result_box.insert("0.0", recap)
+                    self.result_box.tag_add("recap", "1.0", "3.0")
+                    self.highlight_json(result)
+                else:
+                    full_output = recap + result + "\n"
+                    self.result_box.insert("0.0", full_output)
+                    self.result_box.tag_add("recap", "1.0", "3.0")
+
+            else:
+                self.result_box.insert("0.0", "Nothing to execute in this mode.")
+
+        except Exception as e:
+            self.result_box.delete("0.0", "end")
+            self.result_box.insert("0.0", f"[ERROR] {str(e)}")
+
+    def highlight_json(self, text):
+        # Insérer après recap
+        insert_point = self.result_box.index("end-1c")
+        self.result_box.insert(insert_point, text + "\n")
+
+        # Définir les tags de couleur
+        self.result_box.tag_config("key", foreground="#FFA500")     # orange
+        self.result_box.tag_config("string", foreground="#00FF00")  # vert
+        self.result_box.tag_config("number", foreground="#00BFFF")  # bleu
+        self.result_box.tag_config("boolean", foreground="#FF69B4") # rose
+        self.result_box.tag_config("null", foreground="#FF0000")    # rouge
+
+        # Index de départ réel après l'insertion
+        start_index = int(float(insert_point.split('.')[0]))
+
+        lines = text.splitlines()
+        for i, line in enumerate(lines):
+            line_index = f"{start_index + i}.0"
+
+            if ':' not in line:
+                continue
+
+            key_part, value_part = line.split(':', 1)
+            key_len = len(key_part)
+            value = value_part.strip()
+
+            # Appliquer les couleurs
+            self.result_box.tag_add("key", line_index, f"{line_index}+{key_len}c")
+
+            value_index = f"{line_index}+{key_len + 1}c"
+            if value.startswith('"'):
+                self.result_box.tag_add("string", value_index, f"{value_index}+{len(value)+1}c")
+            elif value in ["true", "false"]:
+                self.result_box.tag_add("boolean", value_index, f"{value_index}+{len(value)+1}c")
+            elif value == "null":
+                self.result_box.tag_add("null", value_index, f"{value_index}+{len(value)+1}c")
+            else:
+                self.result_box.tag_add("number", value_index, f"{value_index}+{len(value)+1}c")
+
+    # JSON FORMAT
+    # def test_api(self):
+    #     from backend.api_backend import test_api_authentication
+
+    #     self.result_box.delete("0.0", "end")
+
+    #     result = test_api_authentication(
+    #         url=self.api_settings["url"],
+    #         username=self.api_settings["username"],
+    #         password=self.api_settings["password"],
+    #         organization=self.api_settings["organization"]
+    #     )
+
+    #     if isinstance(result, dict) and result.get("status"):
+    #         self.result_box.insert("0.0", "Authentication successful!\n\n")
+    #         self.result_box.tag_config("success", foreground="#00FF00")
+    #         self.result_box.tag_add("success", "1.0", "2.0")
+
+    #         recap = (
+    #             f'URL: {self.api_settings["url"]}\n'
+    #             f'Username: {self.api_settings["username"]}\n'
+    #             f'Organization: {self.api_settings["organization"]}\n\n'
+    #         )
+    #         recap_start = self.result_box.index("end-1c")
+    #         self.result_box.insert("end", recap)
+    #         self.result_box.tag_config("field", foreground="#FFA500")
+    #         for field in ["URL", "Username", "Organization"]:
+    #             self.highlight_word(recap_start, field, "field")
+
+    #         self.highlight_json(json.dumps(result["data"], indent=2))
+
+    #     else:
+    #         self.result_box.insert("0.0", f"Authentication failed.\n\n{result.get('data', 'Unknown error')}")
+    #         self.result_box.tag_config("error", foreground="#FF4444")
+    #         self.result_box.tag_add("error", "1.0", "3.0")
+    
+    def test_api(self):
+        from backend.api_backend import test_api_authentication
+
+        # Clear previous result
+        self.result_box.delete("0.0", "end")
+
+        # Get current values from form fields
+        url = self.url_entry.get()
+        username = self.username_entry.get()
+        password = self.password_entry.get()
+        organization = self.org_entry.get()
+
+        result = test_api_authentication(url, username, password, organization)
+
+        if isinstance(result, dict) and result.get("status"):
+            # Authentication success message
+            self.result_box.insert("end", "Authentication successful\n\n", "success")
+            self.result_box.tag_config("success", foreground="#00FF00")
+
+            # Recap fields
+            recap_text = (
+                f"URL: {url}\n"
+                f"Username: {username}\n"
+                f"Organization: {organization}\n\n"
+            )
+            start = self.result_box.index("end-1c")
+            self.result_box.insert("end", recap_text)
+            self.result_box.tag_config("field", foreground="#FFA500")
+            for word in ["URL", "Username", "Organization"]:
+                self.highlight_word(start, word, "field")
+
+            # Display system info summary
+            self.display_system_summary(result["data"])
+
+        else:
+            self.result_box.insert("0.0", f"Authentication failed.\n\n{result.get('data', 'Unknown error')}")
+            self.result_box.tag_config("error", foreground="#FF4444")
+            self.result_box.tag_add("error", "1.0", "3.0")
+
+    def display_system_summary(self, data):
+        lines = []
+        lines.append("System Summary\n==============\n")
+
+        lines.append(f"License Expiration: {data.get('licenseExpirationDate', 'N/A')}")
+        lines.append(f"Endpoints Capacity: {data.get('endpointsLicenseCapacity', 'N/A')}")
+        lines.append(f"Registered Collectors: {data.get('registeredCollectors', 'N/A')}")
+        lines.append(f"Mobile In Use: {data.get('mobileInUse', 'N/A')}\n")
+
+        lines.append("License Features:")
+        for feature in data.get("licenseFeatures", []):
+            lines.append(f"  - {feature}")
+        lines.append("")
+
+        lines.append("Collectors State:")
+        for k, v in data.get("collectorsState", {}).items():
+            lines.append(f"  {k}: {v}")
+        lines.append("")
+
+        lines.append(f"Management Version: {data.get('managementVersion', 'N/A')}")
+        lines.append(f"Content Version: {data.get('contentVersion', 'N/A')}\n")
+
+        lines.append("Collector Versions:")
+        for version in data.get("collectorVersionsV2", []):
+            lines.append(f"  {version['version']} (x{version['count']})")
+        lines.append("")
+
+        lines.append("Cores:")
+        for core in data.get("cores", []):
+            lines.append(f"  {core['name']} - Version: {core['version']}")
+        lines.append("")
+
+        lines.append("Aggregators:")
+        for aggr in data.get("aggregators", []):
+            lines.append(f"  {aggr['name']} - Version: {aggr['version'].strip()}")
+        lines.append("")
+
+        lines.append("Repositories:")
+        for repo in data.get("repositories", []):
+            lines.append(f"  {repo['address']} - Status: {repo['status']}")
+
+        start = self.result_box.index("end-1c")
+        self.result_box.insert("end", "\n".join(lines))
+
+        # Color sections
+        self.highlight_word(start, "System Summary", "recap")
+        self.highlight_word(start, "License Features:", "field")
+        self.highlight_word(start, "Collectors State:", "field")
+        self.highlight_word(start, "Collector Versions:", "field")
+        self.highlight_word(start, "Cores:", "field")
+        self.highlight_word(start, "Aggregators:", "field")
+        self.highlight_word(start, "Repositories:", "field")
+
+    def highlight_word(self, start, word, tag):
+        index = self.result_box.search(word, start, stopindex="end")
+        while index:
+            end_index = f"{index}+{len(word)}c"
+            self.result_box.tag_add(tag, index, end_index)
+            index = self.result_box.search(word, end_index, stopindex="end")
+
+    def set_var(self, key, value, mode_prefix):
+        # Set selected value
+        if mode_prefix == "ev":
+            self.ev_vars[key] = value
+            group = self.ev_buttons.get(key, [])
+        elif mode_prefix == "th":
+            self.th_vars[key] = value
+            group = self.th_buttons.get(key, [])
+        else:
+            return
+
+        # Update button colors in this group
+        for btn in group:
+            try:
+                if btn.cget("text") == value:
+                    btn.configure(fg_color="#FFA500", hover_color="#FFA500")
+                else:
+                    btn.configure(fg_color="#2e2e2e", hover_color="#444444")
+            except tk.TclError:
+                continue
+       
+    def clear_results(self):
+        self.result_box.delete("0.0", "end")
+
+
+
+=================
+gui\malware_gui.py
+=================
+import customtkinter as ctk
+import tkinter as tk
+from CTkSpinbox import *
+from backend.malware_backend import run_malwarebazaar_action, open_download_folder
+import threading
+import os
+import subprocess
+
+class MalwareBazaarView:
+    def __init__(self, options_frame, results_frame):
+        self.options_frame = options_frame
+        self.results_frame = results_frame
+        self.filetype_buttons = []
+        self.tag_buttons = []
+        self.selected_filetype = "exe"
+        self.selected_tag = None
+
+        self.filetype_groups = {
+            "Executables": ["exe", "dll", "msi"],
+            "Scripts": ["ps1", "bat", "js", "vbs"],
+            "Documents": ["doc", "docx", "xls", "xlsx", "pdf"],
+            "Archives / Images": ["zip", "rar", "iso"]
+        }
+
+        self.tag_groups = {
+            "RATs / Stealers": ["agenttesla", "remcos", "lokibot", "redline", "formbook", "nanocore", "rat", "infostealer", "mirai"],
+            "Banking / Loaders": ["emotet", "quakbot", "dridex"],
+            "Generic Tags": ["ransomware", "trojan", "downloader"]
+        }
+
+        self.show_interface()
+
+    def show_interface(self):
+        ctk.CTkLabel(self.options_frame, text="Download recent malware samples from MalwareBazaar", font=("Arial", 16, "bold"), text_color="#FFA500").pack(pady=(10, 0), padx=10, anchor="w")
+        ctk.CTkLabel(self.options_frame, text="Select a file type or a tag", font=("Arial", 14), text_color="white").pack(pady=(0, 10), padx=10, anchor="w")
+
+        canvas = tk.Canvas(self.options_frame, highlightthickness=0, bg="#212121", bd=0)
+        canvas.pack(side="top", fill="both", expand=True, padx=10)
+
+        inner_frame = ctk.CTkFrame(canvas, fg_color="transparent")
+        window_id = canvas.create_window((0, 0), window=inner_frame, anchor="nw")
+
+        def on_configure(event): canvas.configure(scrollregion=canvas.bbox("all"))
+        def resize_width(event): canvas.itemconfig(window_id, width=event.width)
+        def on_mousewheel(event): canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+
+        inner_frame.bind("<Configure>", on_configure)
+        canvas.bind("<Configure>", resize_width)
+        canvas.bind_all("<MouseWheel>", on_mousewheel)
+        canvas.configure(yscrollcommand=lambda *args: None)
+
+        criteria_frame = ctk.CTkFrame(inner_frame, fg_color="transparent")
+        criteria_frame.pack(pady=0)
+
+        filetype_col = ctk.CTkFrame(criteria_frame, fg_color="transparent", width=140)
+        filetype_col.pack(side="left", padx=(0, 30), fill="y")
+        tag_col = ctk.CTkFrame(criteria_frame, fg_color="transparent", width=140)
+        tag_col.pack(side="left", padx=(30, 0), fill="y")
+
+        ctk.CTkLabel(filetype_col, text="File Types", font=("Arial", 14, "bold"), text_color="#FFA500").pack(anchor="w", pady=(0, 5))
+        for group, types in self.filetype_groups.items():
+            ctk.CTkLabel(filetype_col, text=group, font=("Arial", 11, "bold"), text_color="white").pack(anchor="w", pady=(10, 2))
+            for ft in types:
+                is_selected = ft == self.selected_filetype
+                btn = ctk.CTkButton(filetype_col, text=ft, width=140, command=lambda f=ft: self.select_filetype(f),
+                                    fg_color="#FFA500" if is_selected else "#2e2e2e",
+                                    hover_color="#FFA500" if is_selected else "#444444",
+                                    text_color="white")
+                btn.pack(pady=2, fill="x")
+                self.filetype_buttons.append(btn)
+
+        ctk.CTkLabel(tag_col, text="Tags", font=("Arial", 14, "bold"), text_color="#FFA500").pack(anchor="w", pady=(0, 5))
+        for group, tags in self.tag_groups.items():
+            ctk.CTkLabel(tag_col, text=group, font=("Arial", 11, "bold"), text_color="white").pack(anchor="w", pady=(10, 2))
+            for tg in tags:
+                btn = ctk.CTkButton(
+                    tag_col,
+                    text=tg,
+                    width=140,
+                    command=lambda t=tg: self.select_tag(t),
+                    fg_color="#FFA500" if is_selected else "#2e2e2e",
+                    hover_color="#FFA500" if is_selected else "#444444",
+                    text_color="white"
+                )
+                btn.pack(pady=2, fill="x")
+                self.tag_buttons.append(btn)
+
+        # Bottom section with 2 right-aligned rows
+        bottom_frame = ctk.CTkFrame(self.options_frame, fg_color="transparent")
+        bottom_frame.pack(side="bottom", fill="x", padx=10, pady=(5, 20))
+
+        # === First row: Number input + Download ===
+        row1 = ctk.CTkFrame(bottom_frame, fg_color="transparent")
+        row1.pack(side="top", anchor="e")  # align right
+
+        ctk.CTkLabel(row1, text="Number of Files:", font=("Arial", 12)).pack(side="left", padx=(0, 5))
+
+        self.mb_num_files = ctk.CTkOptionMenu(
+            row1,
+            width=60,
+            values=["1", "2", "3", "4", "5"],
+            command=self.validate_num_files  # Optional: immediate display of an error if ever
+        )
+        self.mb_num_files.pack(side="left", padx=(0, 10))
+        self.mb_num_files.set("1")
+
+        self.download_btn = ctk.CTkButton(row1, text="Download", command=self.execute_download, width=100,
+                                        fg_color="#1f6aa5", hover_color="#1f6aa5", text_color="white")
+        self.download_btn.pack(side="left", padx=(0, 10))
+
+        # === Second row: SSL + Other buttons ===
+        row2 = ctk.CTkFrame(bottom_frame, fg_color="transparent")
+        row2.pack(side="top", anchor="e", pady=(5, 0))  # align right
+
+        btn_style = {"fg_color": "#2e2e2e", "hover_color": "#444444", "text_color": "white"}
+
+        ssl_wrapper = ctk.CTkFrame(row2, fg_color="transparent")
+        ssl_wrapper.pack(side="left", padx=(0, 15))
+
+        ctk.CTkLabel(ssl_wrapper, text="SSL Inspection", font=("Arial", 12), text_color="white").pack(side="left", padx=(0, 5))
+        self.ca_switch = ctk.CTkSwitch(ssl_wrapper, text="", command=self.toggle_ca)
+        self.ca_switch.pack(side="left")
+        self.ca_switch.select()
+        os.environ["USE_CUSTOM_CA"] = "True"
+
+        self.info_btn = ctk.CTkButton(row2, text="Check Samples", command=self.execute_info, width=110, **btn_style)
+        self.info_btn.pack(side="left", padx=(0, 10))
+
+        self.open_btn = ctk.CTkButton(row2, text="Open Folder", command=open_download_folder, width=100, **btn_style)
+        self.open_btn.pack(side="left", padx=(0, 10))
+
+        self.result_box = ctk.CTkTextbox(self.results_frame, font=("Courier New", 13))
+        self.result_box.pack(expand=True, fill="both", padx=10, pady=10)
+        self.result_box.tag_config("filename", foreground="red")
+        self.result_box.tag_config("orange", foreground="#FFA500")
+        self.result_box.tag_config("green", foreground="lightgreen")
+        self.result_box.tag_config("red", foreground="red")
+
+        self.select_filetype("exe")
+
+    def toggle_ca(self):
+        os.environ["USE_CUSTOM_CA"] = "True" if self.ca_switch.get() else "False"
+
+    def select_filetype(self, selected):
+        self.selected_filetype = selected
+        self.selected_tag = None
+        for btn in self.filetype_buttons:
+            is_selected = btn.cget("text") == selected
+            btn.configure(
+                fg_color="#FFA500" if is_selected else "#2e2e2e",
+                hover_color="#FFA500" if is_selected else "#444444"
+            )
+        for btn in self.tag_buttons:
+            btn.configure(fg_color="#2e2e2e")
+
+    def select_tag(self, selected):
+        self.selected_tag = selected
+        self.selected_filetype = None
+        for btn in self.tag_buttons:
+            is_selected = btn.cget("text") == selected
+            btn.configure(
+                fg_color="#FFA500" if is_selected else "#2e2e2e",
+                hover_color="#FFA500" if is_selected else "#444444"
+            )
+        for btn in self.filetype_buttons:
+            btn.configure(fg_color="#2e2e2e")
+
+    def execute_common(self, action_func, button):
+        file_type = self.selected_filetype
+        tag = self.selected_tag
+        num_raw = self.mb_num_files.get()
+        num = int(num_raw)
+
+        # Dynamically update the button text to show action in progress
+        original_text = button.cget("text")
+        if original_text == "Download":
+            button.configure(text="Downloading...", state="disabled")
+        elif original_text == "Check Samples":
+            button.configure(text="Checking...", state="disabled")
+        else:
+            button.configure(text="Working...", state="disabled")
+
+        cert_info = os.getenv("USE_CUSTOM_CA", "False")
+        cert_line = "Using Fortinet_CA_SSL.cer (SSL inspection enabled)" if cert_info.lower() == "true" else "Standard SSL connection (no SSL inspection)"
+        selected = f"Selected Tag: '{tag}'" if tag else f"Selected File Type: '{file_type}'"
+        recap = f"{selected}\nNumber of Files: {num}\nCertificate: {cert_line}\n\n"
+
+        self.result_box.delete("0.0", "end")
+        self.result_box.insert("end", recap)
+        self.result_box.insert("end", "Connecting to MalwareBazaar...\n\n", "orange")
+
+        def task():
+            try:
+                result = action_func(tag=tag, file_type=file_type, limit=num)
+            except Exception as e:
+                result = f"[ERROR] {str(e)}"
+
+            def display():
+                for line in result.strip().splitlines():
+                    line = line.rstrip()
+
+                    # Special case: summary line of download result
+                    if "file(s) downloaded successfully" in line.lower():
+                        try:
+                            number = int(line.split()[0])
+                            if number == 0:
+                                self.result_box.insert("end", line + "\n", "red")
+                            else:
+                                self.result_box.insert("end", line + "\n", "green")
+                        except Exception:
+                            self.result_box.insert("end", line + "\n")  # fallback
+
+                    # Highlight metadata key in orange
+                    elif line.startswith("- "):
+                        key, _, value = line.partition(":")
+                        key = key.strip() + ":"
+                        value = value.strip()
+
+                        if "success" in value.lower():
+                            self.result_box.insert("end", f"  {key} ", "orange")
+                            self.result_box.insert("end", f"{value}\n", "green")
+                        elif "failed" in value.lower():
+                            self.result_box.insert("end", f"  {key} ", "orange")
+                            self.result_box.insert("end", f"{value}\n", "red")
+                        else:
+                            self.result_box.insert("end", f"  {key} ", "orange")
+                            self.result_box.insert("end", f"{value}\n")
+
+                    elif line.lower() == "done!":
+                        self.result_box.insert("end", "\nDone!\n", "orange")
+
+                    else:
+                        self.result_box.insert("end", line + "\n", "filename")
+
+                # Reset button to original label
+                button.configure(
+                    text="Download" if button == self.download_btn else "Check Samples",
+                    state="normal"
+                )
+
+            self.result_box.after(0, display)
+
+        threading.Thread(target=task).start()
+
+    def execute_download(self):
+        self.execute_common(lambda **kwargs: run_malwarebazaar_action(**kwargs, only_info=False), self.download_btn)
+
+    def execute_info(self):
+        self.execute_common(lambda **kwargs: run_malwarebazaar_action(**kwargs, only_info=True), self.info_btn)
+
+    def validate_num_files(self, value):
+        try:
+            num = int(value)
+            if not (1 <= num <= 5):
+                raise ValueError
+        except ValueError:
+            self.result_box.insert("end", "[ERROR] Please choose a value between 1 and 5.\n", "red")
+
+=================
+gui\mitre_gui.py
+=================
+import customtkinter as ctk
+import tkinter as tk
+from tkinter import messagebox
+from data.tests import tests
+from backend.mitre_backend import execute_atomic_test
+import threading
+
+class MitreView:
+    def __init__(self, options_frame, results_frame):
+        self.options_frame = options_frame
+        self.results_frame = results_frame
+        self.selected_test = None
+        self.test_buttons = []
+        self.setup_ui()
+
+    def setup_ui(self):
+        title = ctk.CTkLabel(
+            self.options_frame,
+            text="Select a MITRE technique to execute",
+            font=("Arial", 16, "bold"),
+            text_color="#FFA500"
+        )
+        title.pack(pady=(10, 5), padx=10, anchor="w")
+
+        container = ctk.CTkFrame(self.options_frame, fg_color="transparent")
+        container.pack(fill="both", expand=True, padx=10)
+        container.grid_columnconfigure(0, weight=1)
+
+        self.button_list_frame = ctk.CTkFrame(container, fg_color="transparent", width=340)
+        self.button_list_frame.grid(row=0, column=0, sticky="w", pady=(0, 5))
+
+        self.test_buttons = []
+        for test in tests:
+            btn = ctk.CTkButton(self.button_list_frame, text=f"{test['id']} - {test['title']}", width=340, anchor="w", height=30, text_color="white", fg_color="#2e2e2e", hover_color="#444444", command=lambda t=test: self.select_test(t))
+            btn.pack(fill="x", pady=2)
+            self.test_buttons.append(btn)
+
+        self.command_frame = ctk.CTkFrame(container, fg_color="transparent")
+        self.command_frame.grid(row=1, column=0, sticky="e", pady=(5, 5))
+
+        self.exec_button = ctk.CTkButton(self.command_frame, text="Execute", command=self.run_test, width=100)
+        self.exec_button.pack(side="right", padx=(5, 0))
+
+        self.cleanup_button = ctk.CTkButton(
+            self.command_frame, text="Cleanup", command=self.cleanup_test, width=100,
+            fg_color="#2e2e2e", hover_color="#444444", text_color="white"
+        )
+        self.cleanup_button.pack(side="right", padx=(5, 0))
+
+        self.details_button = ctk.CTkButton(
+            self.command_frame, text="Show Details", command=self.details_test, width=100,
+            fg_color="#2e2e2e", hover_color="#444444", text_color="white"
+        )
+        self.details_button.pack(side="right", padx=(5, 0))
+
+        self.clear_button = ctk.CTkButton(self.command_frame, text="Clear", command=self.clear_results, width=100, fg_color="#2e2e2e", hover_color="#444444", text_color="white")
+        self.clear_button.pack(side="right", padx=(5, 0))
+
+        self.description_box = ctk.CTkTextbox(container, wrap="word", activate_scrollbars=False)
+        self.description_box.grid(row=2, column=0, sticky="nsew", pady=(5, 10))
+        self.description_box.configure(state="disabled")
+
+        container.grid_rowconfigure(2, weight=1)
+
+        # self.result_box = ctk.CTkTextbox(self.results_frame)
+        self.result_box = ctk.CTkTextbox(self.results_frame, font=("Courier New", 13))
+        self.result_box.pack(expand=True, fill="both", padx=10, pady=10)
+        self.result_box.tag_config("orange", foreground="#FFA500")
+        self.result_box.tag_config("red", foreground="red")
+        #self.result_box.insert("0.0", "Execution results will appear here...")
+
+        if tests:
+            self.select_test(tests[0])
+
+    def run_test(self):
+        command = self.selected_test["command"] if self.selected_test else ""
+        self.exec_button.configure(text="Executing...", state="disabled")
+        # self.exec_button.configure(text="⏳ Executing...", state="disabled")
+        self.result_box.delete("1.0", "end")
+        self.result_box.insert("end", "Executing command:\n", "orange")
+        self.result_box.insert("end", f"{command}\n\n")
+        threading.Thread(target=lambda: self.execute_and_show_result(command)).start()
+
+    def execute_and_show_result(self, command):
+        stdout, stderr = execute_atomic_test(command)
+        self.results_frame.after(0, lambda: self.display_result(stdout, stderr))
+
+    def display_result(self, stdout, stderr):
+        if stdout: self.result_box.insert("end", "Output:\n", "orange"); self.result_box.insert("end", f"{stdout}\n")
+        if stderr: self.result_box.insert("end", "\nErrors:\n", "red"); self.result_box.insert("end", f"{stderr}\n")
+        self.exec_button.configure(text="Execute", state="normal")
+
+    def select_test(self, test):
+        self.selected_test = test
+
+        for btn in self.test_buttons:
+            if btn.cget("text").startswith(test["id"]):
+                btn.configure(fg_color="#FFA500", hover_color="#FFA500", text_color="white")
+            else:
+                btn.configure(fg_color="#2e2e2e", hover_color="#444444", text_color="white")
+
+        self.description_box.configure(state="normal")
+        self.description_box.delete("0.0", "end")
+        self.description_box.insert("0.0", f"{test['test']}\n", ("orange",))
+        self.description_box.insert("end", f"{test['description']}\n\n")
+        self.description_box.insert("end", "Violated Policies\n", ("orange",))
+        for rule in test["rules"]:
+            if rule.startswith("-"):
+                self.description_box.insert("end", f"  - {rule[2:]}\n")
+            else:
+                self.description_box.insert("end", f"{rule}\n")
+        self.description_box.insert("end", "\nCommand\n", ("orange",))
+        self.description_box.insert("end", f"{test['command']}")
+        self.description_box.tag_config("orange", foreground="#FFA500")
+        self.description_box.configure(state="disabled")
+
+    def run_command(self, command):
+        self.result_box.delete("0.0", "end")
+        self.result_box.insert("0.0", f"{command}\n")
+        self.result_box.insert("0.0", "Running command:\n", "orange")
+        self.result_box.update_idletasks()
+
+        stdout, stderr = execute_atomic_test(command)
+
+        if stdout:
+            self.result_box.insert("end", "\n", "orange")
+            self.result_box.insert("end", "Output:\n", "orange")
+            self.result_box.insert("end", f"{stdout}\n")
+        if stderr:
+            self.result_box.insert("end", "\n", "red")
+            self.result_box.insert("end", "Errors:\n", "red")
+            self.result_box.insert("end", f"{stderr}\n")
+
+    def execute_test(self):
+        if not self.selected_test:
+            messagebox.showwarning("No Test Selected", "Please select a test to execute.")
+            return
+        command = self.selected_test["command"]
+        self.run_command(command)
+
+    def cleanup_test(self):
+        if not self.selected_test:
+            return
+        command = self.selected_test["command"] + " -Cleanup"
+        self.run_command(command)
+
+    def details_test(self):
+        if not self.selected_test:
+            return
+        command = self.selected_test["command"] + " -ShowDetails"
+        self.run_command(command)
+
+    def clear_results(self):
+        self.result_box.delete("0.0", "end")
+
+=================
+gui\widgets.py
+=================
+import customtkinter as ctk
+
+def create_nav_button(parent, text, command, fg="#1f1f1f", hover="#333333", text_color="white"):
+    return ctk.CTkButton(
+        parent,
+        text=text,
+        command=command,
+        fg_color=fg,
+        hover_color=hover,
+        text_color=text_color,
+        corner_radius=6,
+        font=("Arial", 12, "bold")
+    )
+
+=================
+gui\__init__.py
+=================
+
+=================
+backend\api_backend.py
+=================
+import os
+import json
+import pandas as pd
+from datetime import datetime, timedelta
+from tabulate import tabulate
+import fortiedr
+from utils import resource_path
+
+DEFAULT_API_URL = os.getenv("API_URL") or ""
+DEFAULT_API_USERNAME = os.getenv("API_USERNAME") or ""
+DEFAULT_API_PASSWORD = os.getenv("API_PASSWORD") or ""
+DEFAULT_API_ORG = os.getenv("API_ORG") or ""
+
+def test_api_authentication(url, username, password, organization):
+    try:
+        authentication = fortiedr.auth(
+            user=username,
+            passw=password,
+            host=url.replace("https://", "").split("/")[0],
+            org=organization
+        )
+
+        if not authentication["status"]:
+            return {"status": False, "data": authentication["data"]}
+
+        admin = fortiedr.Administrator()
+        system_info = admin.list_system_summary(organization=organization)
+
+        return {
+            "status": True,
+            "data": system_info["data"]
+        }
+
+    except Exception as e:
+        return {"status": False, "data": str(e)}
+
+def save_api_settings(self):
+    self.api_settings = {
+        "url": self.url_entry.get(),
+        "username": self.username_entry.get(),
+        "password": self.password_entry.get(),
+        "organization": self.org_entry.get()
+    }
+
+def run_event_query(output_format="Table", items="1", action="All", time_range="1 hour"):
+    auth = fortiedr.auth(
+        user=os.getenv("API_USERNAME"),
+        passw=os.getenv("API_PASSWORD"),
+        host=os.getenv("API_URL"),
+        org=os.getenv("API_ORG")
+    )
+
+    if not auth['status']:
+        return json.dumps({"error": "Authentication failed.", "details": auth['data']}, indent=2)
+
+    method = fortiedr.Events()
+
+    # Convertir le time_range
+    hours = int(time_range.split()[0])
+    time_from = (datetime.now() - timedelta(hours=hours)).strftime("%Y-%m-%d %H:%M:%S")
+    time_to = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    params = {"firstSeenFrom": time_from, "firstSeenTo": time_to}
+    if action != "All":
+        params["actions"] = action
+    if items != "No limit":
+        try:
+            params["itemsPerPage"] = int(items)
+        except ValueError:
+            pass
+
+    response = method.list_events(**params)
+
+    if not response['status']:
+        return json.dumps({"error": "Failed to fetch events.", "details": response['data']}, indent=2)
+
+    if output_format.lower() == "json":
+        return json.dumps(response['data'], indent=2)
+
+    # Format table avec colonne Rule(s)
+    table_data = []
+    for i, entry in enumerate(response['data'], start=1):
+        process = entry.get("process", "")
+        rules = entry.get("rules", [])
+        process_display = process if len(process) <= 25 else process[:22] + "..."
+        rule_str = "\n".join(rules) if rules else ""
+
+        table_data.append([
+            i,
+            str(entry.get("eventId", ""))[:10],
+            process_display,
+            entry.get("firstSeen", "")[:16],
+            entry.get("lastSeen", "")[:16],
+            entry.get("classification", "")[:13],
+            entry.get("collectors", [{}])[0].get("device", "N/A")[:15],
+            entry.get("action", ""), 
+            rule_str
+        ])
+
+    headers = ["#", "Event ID", "Process", "First Seen", "Last Seen", "Classification", "Device", "Action", "Rule(s)"]
+    df = pd.DataFrame(table_data, columns=headers)
+    return tabulate(df, headers="keys", tablefmt="fancy_grid", showindex=False)
+
+def run_threat_query(fmt, items, category, time_range):
+    """Fetch FortiEDR threat hunting results."""
+    auth = fortiedr.auth(
+        user=os.getenv("API_USERNAME"),
+        passw=os.getenv("API_PASSWORD"),
+        host=os.getenv("API_URL"),
+        org=os.getenv("API_ORG")
+    )
+
+    if not auth['status']:
+        return json.dumps({"error": "Authentication failed.", "details": auth['data']}, indent=2)
+
+    method = fortiedr.ThreatHunting()
+    params = {
+        "itemsPerPage": int(items),
+        "category": None if category == "All" else category,
+        "time": time_range
+    }
+
+    # Remove empty values
+    params = {k: v for k, v in params.items() if v}
+
+    response = method.search(**params)
+
+    if not response['status']:
+        return json.dumps({"error": "Failed to fetch threat data.", "details": response['data']}, indent=2)
+
+    if fmt.lower() == "json":
+        return json.dumps(response['data'], indent=2)
+
+    table_data = []
+    for index, event in enumerate(response['data'], start=1):
+        source_process = event['Source'].get('Process', {})
+        command_line = source_process.get('CommandLine', 'N/A')
+        user_info = source_process.get('User', {})
+        username = user_info.get('Username', 'N/A')
+        target_path = event['Target'].get('File', {}).get('Path', 'N/A')
+
+        command_line_display = command_line if len(command_line) <= 25 else command_line[:22] + "..."
+        target_path_display = target_path if len(target_path) <= 25 else target_path[:22] + "..."
+
+        table_data.append([ 
+            index,
+            datetime.fromtimestamp(event['Time'] / 1000).strftime('%Y-%m-%d %H:%M:%S'),
+            event['Type'],
+            event['Device']['Name'],
+            source_process.get('Name', 'N/A'),
+            command_line_display,
+            target_path_display,
+            username
+        ])
+
+    headers = ["#", "Time", "Type", "Device Name", "Process Name", "Command Line", "Target Path", "User"]
+    df = pd.DataFrame(table_data, columns=headers)
+    return tabulate(df, headers="keys", tablefmt="fancy_grid", showindex=False)
+
+=================
+backend\diagnostics.py
+=================
+import os
+import socket
+import subprocess
+import platform
+import json
+from dotenv import load_dotenv
+import fortiedr
+import threading
+
+load_dotenv()
+
+API_URL = os.getenv("API_URL")
+API_USERNAME = os.getenv("API_USERNAME")
+API_PASSWORD = os.getenv("API_PASSWORD")
+API_ORG = os.getenv("API_ORG")
+
+def run_command(command, result_box):
+    result_box.insert("end", f"\n[COMMAND] {command}\n", "command")
+    result_box.update_idletasks()
+    try:
+        result = subprocess.run(command, shell=True, capture_output=True, text=True)
+        if result.stdout:
+            result_box.insert("end", result.stdout.strip() + "\n", "stdout")
+        if result.stderr:
+            result_box.insert("end", result.stderr.strip() + "\n", "stderr")
+    except Exception as e:
+        result_box.insert("end", f"[EXCEPTION] {str(e)}\n", "stderr")
+    result_box.insert("end", "\n")
+    result_box.update_idletasks()
+
+def check_internet_and_dns(result_box):
+    result_box.insert("end", "\n─── Internet Connectivity ───\n", "section")
+    run_command("ping 8.8.8.8 -n 2", result_box)
+
+    result_box.insert("end", "\n─── DNS Resolution (API_URL) ───\n", "section")
+    dns_target = API_URL.replace("https://", "").split("/")[0]
+    run_command(f"nslookup {dns_target}", result_box)
+
+def get_core_and_aggregator(result_box):
+    result_box.insert("end", "\n─── Fetch Core and Aggregator from API ───\n", "section")
+    try:
+        auth = fortiedr.auth(
+            user=API_USERNAME,
+            passw=API_PASSWORD,
+            host=API_URL.replace("https://", "").split("/")[0],
+            org=API_ORG
+        )
+
+        if not auth['status']:
+            result_box.insert("end", f"Authentication failed: {auth['data']}\n", "stderr")
+            return None, None
+
+        admin = fortiedr.Administrator()
+        data = admin.list_system_summary(organization=API_ORG)['data']
+
+        core_addr = data.get("cores", [{}])[0].get("address", "").split(":")[0]
+        aggregator_addr = data.get("aggregators", [{}])[0].get("address", "").split(":")[0]
+
+        result_box.insert("end", f"Core IP: {core_addr}\n", "stdout")
+        result_box.insert("end", f"Aggregator IP: {aggregator_addr}\n", "stdout")
+        result_box.update_idletasks()
+
+        return core_addr, aggregator_addr
+
+    except Exception as e:
+        result_box.insert("end", f"API Error: {str(e)}\n", "stderr")
+        return None, None
+
+def test_net_connection(result_box, hostname, port):
+    result_box.insert("end", f"\n─── Test Network Connection to {hostname}:{port} ───\n", "section")
+    command = f"powershell -Command \"Test-NetConnection {hostname} -Port {port} -InformationLevel Detailed\""
+    run_command(command, result_box)
+
+def check_open_ports(result_box):
+    result_box.insert("end", "\n─── Check Open Connections (NETSTAT) ───\n", "section")
+    run_command("netstat -an | findstr 8081", result_box)
+    run_command("netstat -an | findstr 555", result_box)
+
+def check_fortiedr_manager_status(result_box):
+    result_box.insert("end", "\n─── FortiEDR Collector Status ───\n", "section")
+    command = "\"C:\\Program Files\\Fortinet\\FortiEDR\\FortiEDRCollectorService.exe\" --estatus"
+    run_command(command, result_box)
+
+def run_all_diagnostics(result_box):
+    def task():
+        result_box.tag_config("section", foreground="#FFA500")     # Orange
+        result_box.tag_config("command", foreground="#00BFFF")     # Light blue
+        result_box.tag_config("stdout", foreground="#FFFFFF")      # White
+        result_box.tag_config("stderr", foreground="#FF4444")      # Red
+        result_box.tag_config("banner", foreground="#00FF00")      # Green
+
+        result_box.insert("end", "\n" + "="*40 + "\n", "banner")
+        result_box.insert("end", "  FortiEDR Health Check\n", "banner")
+        result_box.insert("end", "="*40 + "\n\n", "banner")
+        result_box.update_idletasks()
+
+        check_internet_and_dns(result_box)
+
+        core, aggregator = get_core_and_aggregator(result_box)
+        if not core or not aggregator:
+            result_box.insert("end", "Aborting: Missing core or aggregator information.\n", "stderr")
+            return
+
+        test_net_connection(result_box, aggregator, 8081)
+        test_net_connection(result_box, core, 555)
+        check_open_ports(result_box)
+        check_fortiedr_manager_status(result_box)
+
+        result_box.insert("end", "\n" + "="*40 + "\n", "banner")
+        result_box.insert("end", "  Diagnostics complete\n", "banner")
+        result_box.insert("end", "="*40 + "\n", "banner")
+        result_box.update_idletasks()
+
+    threading.Thread(target=task).start()
+
+=================
+backend\FortiEDRAvScanner.py
+=================
+import os
+import subprocess
+import csv
+from pathlib import Path
+import pandas as pd
+from tabulate import tabulate
+
+def run_av_scan(result_box):
+    desktop = Path.home() / "Desktop"
+    scan_dir = desktop / "MalwareBazaar_Downloads"
+    output_dir = desktop / "FortiEDRAvScanner"
+    output_csv = desktop / "FortiEDRAvScanner.csv"
+
+    scanner_exe = r'"C:\Program Files\Fortinet\FortiEDR\FortiEDRAvScanner.exe"'
+    signatures = r"C:\ProgramData\FortiEDR\Config\Collector\Signatures"
+    command = f'{scanner_exe} -d "{scan_dir}" -s {signatures} --output "{output_dir}"'
+
+    result_box.delete("0.0", "end")
+    result_box.insert("end", f"[COMMAND] {command}\n\n", "orange")
+    result_box.update_idletasks()
+
+    try:
+        subprocess.run(command, shell=True, check=True)
+        result_box.insert("end", "Scan completed!\n\n", "green")
+    except Exception as e:
+        result_box.insert("end", f"Scan error: {str(e)}\n", "red")
+        return
+
+    if not output_csv.exists():
+        result_box.insert("end", "CSV output not found.\n", "red")
+        return
+
+    try:
+        with open(output_csv, newline='', encoding='utf-8') as f:
+            reader = csv.DictReader(f)
+            rows = list(reader)
+
+        if not rows:
+            result_box.insert("end", "No results found in CSV.\n", "red")
+            return
+
+        table_data = []
+        for row in rows:
+            file_name = os.path.basename(row["File name"])
+            virus = row.get("Virus name", "")
+            table_data.append([file_name, virus if virus else "No detection"])
+
+        df = pd.DataFrame(table_data, columns=["File name", "Virus name"])
+        table_string = tabulate(df, headers="keys", tablefmt="fancy_grid", showindex=False)
+
+        result_box.insert("end", table_string + "\n", "white")
+
+    except Exception as e:
+        result_box.insert("end", f"Error reading CSV: {str(e)}\n", "red")
+
+=================
+backend\malware_backend.py
+=================
+import os
+import json
+import requests
+import pyzipper
+from datetime import datetime
+from pathlib import Path
+import platform
+import subprocess
+
+API_URL = "https://mb-api.abuse.ch/api/v1/"
+
+def get_verify_setting():
+    """Return SSL verification setting based on environment variable"""
+    use_custom_ca = os.getenv('USE_CUSTOM_CA', 'False').lower() == 'true'
+    if use_custom_ca:
+        return os.path.join(os.path.dirname(__file__), "Fortinet_CA_SSL.cer")
+    return True
+
+def get_output_dir():
+    """Ensure and return the output directory on Desktop"""
+    desktop = Path(os.path.join(os.environ["USERPROFILE"], "Desktop"))
+    output_dir = desktop / "MalwareBazaar_Downloads"
+    output_dir.mkdir(parents=True, exist_ok=True)
+    return output_dir
+
+def fetch_more_hashes(tag, file_type, batch_size=20):
+    """Fetch more hashes than needed to compensate for failed downloads"""
+    selected_tag = tag or file_type
+    if not selected_tag:
+        return [], "[ERROR] Please select either a tag or file type."
+
+    data = {
+        "query": "get_taginfo",
+        "tag": selected_tag,
+        "limit": str(batch_size)
+    }
+
+    try:
+        res = requests.post(API_URL, data=data, verify=get_verify_setting(), timeout=30)
+        res.raise_for_status()
+        json_data = res.json()
+
+        if json_data.get("query_status") == "no_results":
+            return [], "[ERROR] No results found."
+
+        entries = []
+        for entry in json_data.get("data", []):
+            entries.append({
+                "sha256": entry['sha256_hash'],
+                "tags": entry.get('tags', ['Unknown']),
+                "file_type": entry.get('file_type', 'unknown'),
+                "file_type_mime": entry.get('file_type_mime', 'application/octet-stream'),
+                "file_name": entry.get('file_name', f"{entry['sha256_hash']}.bin"),
+                "first_seen": entry.get('first_seen', 'N/A'),
+                "size": entry.get('file_size', 0)
+            })
+
+        return entries, None
+    except Exception as e:
+        return [], f"[ERROR] Failed to fetch hashes: {str(e)}"
+
+def download_and_unzip_file(entry, output_dir):
+    """Download and unzip one sample from MalwareBazaar"""
+    try:
+        res = requests.post(API_URL, data={"query": "get_file", "sha256_hash": entry["sha256"]},
+                            verify=get_verify_setting(), timeout=30)
+        res.raise_for_status()
+        zip_path = output_dir / f"{entry['sha256']}.zip"
+        with open(zip_path, "wb") as f:
+            f.write(res.content)
+
+        with pyzipper.AESZipFile(zip_path) as zf:
+            zf.pwd = b'infected'
+            zf.extractall(output_dir)
+            for uf in zf.namelist():
+                src = output_dir / uf
+                dst = output_dir / entry["file_name"]
+                if src.exists():
+                    if dst.exists():
+                        dst.unlink()  # Delete the existing file
+                    src.rename(dst)
+
+        os.remove(zip_path)
+        return "success"
+    except Exception as e:
+        return f"failed ({str(e)})"
+
+def run_malwarebazaar_action(tag=None, file_type=None, limit=3, only_info=False):
+    output_dir = get_output_dir()
+    hashes, error = fetch_more_hashes(tag, file_type, batch_size=20)
+
+    if error:
+        return error + "\nDone!\n"
+    if not hashes:
+        return "[ERROR] No hashes available.\nDone!\n"
+
+    results = []
+    success_count = 0
+
+    for entry in hashes:
+        # Display file details
+        results.append(f"{entry['file_name']}")
+        results.append(f"- File Type: {entry['file_type']}, {entry['file_type_mime']}")
+        results.append(f"- Size: {entry['size']} bytes")
+        results.append(f"- SHA256: {entry['sha256']}")
+        results.append(f"- First Seen: {entry['first_seen']}")
+        results.append(f"- Tags: {', '.join(entry['tags'])}")
+
+        if only_info:
+            results.append("")  # spacing
+            continue
+
+        # Attempt to download
+        status = download_and_unzip_file(entry, output_dir)
+        if status == "success":
+            results.append("- Download: success")  # highlight in green
+            success_count += 1
+        else:
+            results.append(f"- Download: {status}")  # highlight in red
+        results.append("")
+
+        if success_count >= int(limit):
+            break
+
+    if not only_info:
+        results.append(f"{success_count} file(s) downloaded successfully.")
+    results.append("Done!")
+    return "\n".join(results)
+
+def open_download_folder():
+    path = str(get_output_dir())
+    if platform.system() == "Windows":
+        os.startfile(path)
+    elif platform.system() == "Darwin":
+        subprocess.run(["open", path])
+    else:
+        subprocess.run(["xdg-open", path])
+
+=================
+backend\mitre_backend.py
+=================
+import subprocess
+
+def execute_atomic_test(command):
+    """
+    Executes the given PowerShell command using subprocess.
+    Returns stdout and stderr as a tuple.
+    """
+    try:
+        result = subprocess.run(
+            ["powershell", "-ExecutionPolicy", "Bypass", "-Command", command],
+            capture_output=True,
+            text=True,
+            timeout=60
+        )
+        return result.stdout.strip(), result.stderr.strip()
+    except Exception as e:
+        return "", f"Execution error: {str(e)}"
+
+=================
+backend\__init__.py
+=================

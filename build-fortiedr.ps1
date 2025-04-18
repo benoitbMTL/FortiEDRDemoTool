@@ -5,6 +5,18 @@ Write-Host "================================" -ForegroundColor Cyan
 Write-Host "Building FortiEDRDemoTool.exe..." -ForegroundColor Cyan
 Write-Host "================================"
 
+# Check if pyinstaller is installed
+if (-not (Get-Command pyinstaller -ErrorAction SilentlyContinue)) {
+    Write-Host "PyInstaller not found. Installing it via pip..." -ForegroundColor Yellow
+    python -m pip install --upgrade pip
+    python -m pip install pyinstaller
+
+    if (-not (Get-Command pyinstaller -ErrorAction SilentlyContinue)) {
+        Write-Host "ERROR: PyInstaller installation failed. Aborting." -ForegroundColor Red
+        exit 1
+    }
+}
+
 # Optional: Clean previous build folders
 Remove-Item -Recurse -Force -ErrorAction SilentlyContinue "build", "dist"
 

@@ -16,21 +16,20 @@ from utils import resource_path
 
 
 # Debug .env path
-env_path = resource_path('.env')
-print(f"[DEBUG] Looking for .env at: {env_path}")
+# env_path = resource_path('.env')
+# print(f"[DEBUG] Looking for .env at: {env_path}")
 
-if os.path.exists(env_path):
-    print("[DEBUG] .env file exists.")
-else:
-    print("[DEBUG] .env file NOT found.")
+# if os.path.exists(env_path):
+#     print("[DEBUG] .env file exists.")
+# else:
+#     print("[DEBUG] .env file NOT found.")
 
-# Now load it
-load_result = load_dotenv(env_path)
-print(f"[DEBUG] .env loaded: {load_result}")
+# # Now load it
+# load_result = load_dotenv(env_path)
+# print(f"[DEBUG] .env loaded: {load_result}")
 
-# Check a key
-print(f"[DEBUG] API_URL = {os.getenv('API_URL')}")
-
+# # Check a key
+# print(f"[DEBUG] API_URL = {os.getenv('API_URL')}")
 
 # Always start in dark mode
 ctk.set_appearance_mode("dark")

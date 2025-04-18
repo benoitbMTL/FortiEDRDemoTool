@@ -7,3 +7,4 @@ fortiedr
 requests
 pyzipper
 CTkSpinbox
+pyinstaller
