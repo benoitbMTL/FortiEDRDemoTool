@@ -1,8 +1,5 @@
 import os
-import socket
 import subprocess
-import platform
-import json
 from dotenv import load_dotenv
 import fortiedr
 import threading
@@ -13,6 +10,17 @@ API_URL = os.getenv("API_URL")
 API_USERNAME = os.getenv("API_USERNAME")
 API_PASSWORD = os.getenv("API_PASSWORD")
 API_ORG = os.getenv("API_ORG")
+
+# Override SSL verification by monkey patching requests inside fortiedr
+import requests
+orig_post = requests.post
+orig_get = requests.get
+requests.post = lambda *args, **kwargs: orig_post(*args, verify=False, **kwargs)
+requests.get = lambda *args, **kwargs: orig_get(*args, verify=False, **kwargs)
+
+# Optional: suppress InsecureRequestWarning
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 def run_command(command, result_box):
     result_box.insert("end", f"\n[COMMAND] {command}\n", "command")
@@ -98,11 +106,11 @@ def run_all_diagnostics(result_box):
 
         core, aggregator = get_core_and_aggregator(result_box)
         if not core or not aggregator:
-            result_box.insert("end", "Aborting: Missing core or aggregator information.\n", "stderr")
-            return
+            result_box.insert("end", "Skipping net tests: Missing core or aggregator.\n", "stderr")
+        else:
+            test_net_connection(result_box, aggregator, 8081)
+            test_net_connection(result_box, core, 555)
 
-        test_net_connection(result_box, aggregator, 8081)
-        test_net_connection(result_box, core, 555)
         check_open_ports(result_box)
         check_fortiedr_manager_status(result_box)
 
