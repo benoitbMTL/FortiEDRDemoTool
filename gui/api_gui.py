@@ -2,7 +2,6 @@ import customtkinter as ctk
 import tkinter as tk
 from dotenv import load_dotenv
 import os
-import json
 from backend.api_backend import run_event_query, run_threat_query, test_api_authentication
 
 EVENT_FORMATS = ["Table", "JSON"]

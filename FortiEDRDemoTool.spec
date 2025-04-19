@@ -20,7 +20,6 @@ a = Analysis(
         ('assets', 'assets'),
         ('.env', '.'),
         (api_json_path, 'fortiedr'),
-        ('backend/Fortinet_CA_SSL.cer', 'backend')
     ],
     hiddenimports=[],
     hookspath=[],
