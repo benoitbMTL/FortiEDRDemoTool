@@ -3,19 +3,7 @@ import json
 import pandas as pd
 from datetime import datetime, timedelta
 from tabulate import tabulate
-
-# Bypass SSL verification for all requests (only in dev/demo environments)
-import requests
-from urllib3.exceptions import InsecureRequestWarning
-requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
-
-# Monkey-patch requests.Session to disable SSL verification globally
-original_request = requests.Session.request
-def unsafe_request(self, method, url, **kwargs):
-    kwargs['verify'] = False
-    return original_request(self, method, url, **kwargs)
-requests.Session.request = unsafe_request
-
+from backend.ssl_bypass import *
 import fortiedr
 
 DEFAULT_API_URL = os.getenv("API_URL") or ""
@@ -168,3 +156,5 @@ def run_threat_query(fmt, items, category, time_range):
     headers = ["#", "Time", "Type", "Device Name", "Process Name", "Command Line", "Target Path", "User"]
     df = pd.DataFrame(table_data, columns=headers)
     return tabulate(df, headers="keys", tablefmt="fancy_grid", showindex=False)
+
+
