@@ -26,7 +26,9 @@ def run_command(command, result_box):
         result = subprocess.run(command, shell=True, capture_output=True, text=True)
 
         if result.stdout:
-            result_box.insert("end", result.stdout.strip() + "\n", "stdout")
+            cleaned_output = clean_tcp_lines_only(result.stdout.strip())
+            result_box.insert("end", cleaned_output + "\n", "stdout")
+
 
         if result.stderr:
             result_box.insert("end", result.stderr.strip() + "\n", "stderr")
@@ -39,11 +41,11 @@ def run_command(command, result_box):
 
 def check_internet_and_dns(result_box):
     insert_section_title(result_box, "Internet Connectivity")
-    run_command('powershell -Command "Test-NetConnection 8.8.8.8 | Select-Object RemoteAddress, PingSucceeded"', result_box)
+    run_command('powershell -Command "Test-NetConnection 8.8.8.8"', result_box)
 
     insert_section_title(result_box, "DNS Resolution (API_URL)")
     dns_target = API_URL.replace("https://", "").split("/")[0]
-    ps_command = f'powershell -Command "Resolve-DnsName {dns_target} | Select-Object Name, IPAddress"'
+    ps_command = f'powershell -Command "Resolve-DnsName {dns_target}"'
     run_command(ps_command, result_box)
 
 
@@ -86,7 +88,7 @@ def check_open_ports(result_box):
     insert_section_title(result_box, "Check Open Connections (netstat)")
     ports = [8081, 555]
     for port in ports:
-        command = f"powershell -Command \"netstat -ano | Select-String ':{port}' | ForEach-Object {{ $_.Line }} | Out-String\""
+        command = f"powershell -Command \"netstat -ano | Select-String ':{port}'\""
         run_command(command, result_box)
 
 def check_fortiedr_manager_status(result_box):
@@ -96,11 +98,13 @@ def check_fortiedr_manager_status(result_box):
 
 def run_all_diagnostics(result_box):
     def task():
-        result_box.tag_config("section", foreground="#FFA500")     # Orange
-        result_box.tag_config("command", foreground="#00BFFF")     # Light blue
-        result_box.tag_config("stdout", foreground="#FFFFFF")      # White
-        result_box.tag_config("stderr", foreground="#FF4444")      # Red
-        result_box.tag_config("banner", foreground="#00FF00")      # Green
+        result_box.tag_config("section", foreground="#FFA500")          # Orange
+        result_box.tag_config("command", foreground="#00BFFF")          # Light blue
+        result_box.tag_config("stdout", foreground="#FFFFFF")           # White
+        result_box.tag_config("stderr", foreground="#FF4444")           # Red
+        result_box.tag_config("banner", foreground="#00FF00")           # Green
+        result_box.tag_config("success_keyword", foreground="#00FF00")  # Green
+        result_box.tag_config("fail_keyword", foreground="#FF4444")     # Red
 
         insert_banner(result_box, "FortiEDR Health Check")
 
@@ -119,6 +123,7 @@ def run_all_diagnostics(result_box):
         check_fortiedr_manager_status(result_box)
 
         insert_banner(result_box, "Diagnostics Complete")
+        highlight_status_keywords(result_box)
 
         result_box.update_idletasks()
 
@@ -127,3 +132,24 @@ def run_all_diagnostics(result_box):
 def insert_banner(result_box, text):
     result_box.tag_config("banner_simple", foreground="#FFFFFF", background="#145A32")
     result_box.insert("end", "\n{:^70}\n\n".format(text), "banner_simple")
+
+def clean_tcp_lines_only(text):
+    return "\n".join(line.lstrip() if line.lstrip().startswith("TCP") else line for line in text.splitlines())
+
+def highlight_status_keywords(result_box):
+    green_words = ["True", "Up", "Updated", "Running", "Connected", "ESTABLISHED"]
+    red_words = ["False", "Down", "Disconnected", "STOPPED", "ERROR"]
+
+    for word in green_words:
+        index = result_box.search(word, "1.0", stopindex="end")
+        while index:
+            end_index = f"{index}+{len(word)}c"
+            result_box.tag_add("success_keyword", index, end_index)
+            index = result_box.search(word, end_index, stopindex="end")
+
+    for word in red_words:
+        index = result_box.search(word, "1.0", stopindex="end")
+        while index:
+            end_index = f"{index}+{len(word)}c"
+            result_box.tag_add("fail_keyword", index, end_index)
+            index = result_box.search(word, end_index, stopindex="end")
