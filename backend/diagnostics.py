@@ -1,6 +1,7 @@
 import os
 import subprocess
 from dotenv import load_dotenv
+from backend.ssl_bypass import *
 import fortiedr
 import threading
 
@@ -11,41 +12,45 @@ API_USERNAME = os.getenv("API_USERNAME")
 API_PASSWORD = os.getenv("API_PASSWORD")
 API_ORG = os.getenv("API_ORG")
 
-# Override SSL verification by monkey patching requests inside fortiedr
-import requests
-orig_post = requests.post
-orig_get = requests.get
-requests.post = lambda *args, **kwargs: orig_post(*args, verify=False, **kwargs)
-requests.get = lambda *args, **kwargs: orig_get(*args, verify=False, **kwargs)
-
-# Optional: suppress InsecureRequestWarning
-import urllib3
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+def insert_section_title(result_box, title, width=70):
+    sep = "─" * width
+    result_box.insert("end", f"\n{sep}\n", "section")
+    result_box.insert("end", f"{title.center(width)}\n", "section")
+    result_box.insert("end", f"{sep}\n", "section")
 
 def run_command(command, result_box):
     result_box.insert("end", f"\n[COMMAND] {command}\n", "command")
     result_box.update_idletasks()
+
     try:
         result = subprocess.run(command, shell=True, capture_output=True, text=True)
+
         if result.stdout:
-            result_box.insert("end", result.stdout.strip() + "\n", "stdout")
+            cleaned_output = clean_tcp_lines_only(result.stdout.strip())
+            result_box.insert("end", cleaned_output + "\n", "stdout")
+
+
         if result.stderr:
             result_box.insert("end", result.stderr.strip() + "\n", "stderr")
+
     except Exception as e:
         result_box.insert("end", f"[EXCEPTION] {str(e)}\n", "stderr")
+
     result_box.insert("end", "\n")
     result_box.update_idletasks()
 
 def check_internet_and_dns(result_box):
-    result_box.insert("end", "\n─── Internet Connectivity ───\n", "section")
-    run_command("ping 8.8.8.8 -n 2", result_box)
+    insert_section_title(result_box, "Internet Connectivity")
+    run_command('powershell -Command "Test-NetConnection 8.8.8.8"', result_box)
 
-    result_box.insert("end", "\n─── DNS Resolution (API_URL) ───\n", "section")
+    insert_section_title(result_box, "DNS Resolution (API_URL)")
     dns_target = API_URL.replace("https://", "").split("/")[0]
-    run_command(f"nslookup {dns_target}", result_box)
+    ps_command = f'powershell -Command "Resolve-DnsName {dns_target}"'
+    run_command(ps_command, result_box)
+
 
 def get_core_and_aggregator(result_box):
-    result_box.insert("end", "\n─── Fetch Core and Aggregator from API ───\n", "section")
+    insert_section_title(result_box, "Fetch Core and Aggregator from API")
     try:
         auth = fortiedr.auth(
             user=API_USERNAME,
@@ -61,11 +66,11 @@ def get_core_and_aggregator(result_box):
         admin = fortiedr.Administrator()
         data = admin.list_system_summary(organization=API_ORG)['data']
 
-        core_addr = data.get("cores", [{}])[0].get("address", "").split(":")[0]
         aggregator_addr = data.get("aggregators", [{}])[0].get("address", "").split(":")[0]
+        core_addr = data.get("cores", [{}])[0].get("address", "").split(":")[0]
 
-        result_box.insert("end", f"Core IP: {core_addr}\n", "stdout")
         result_box.insert("end", f"Aggregator IP: {aggregator_addr}\n", "stdout")
+        result_box.insert("end", f"Core IP: {core_addr}\n", "stdout")
         result_box.update_idletasks()
 
         return core_addr, aggregator_addr
@@ -75,31 +80,34 @@ def get_core_and_aggregator(result_box):
         return None, None
 
 def test_net_connection(result_box, hostname, port):
-    result_box.insert("end", f"\n─── Test Network Connection to {hostname}:{port} ───\n", "section")
+    insert_section_title(result_box, f"Test Network Connection to {hostname}:{port}")
     command = f"powershell -Command \"Test-NetConnection {hostname} -Port {port} -InformationLevel Detailed\""
     run_command(command, result_box)
 
 def check_open_ports(result_box):
-    result_box.insert("end", "\n─── Check Open Connections (NETSTAT) ───\n", "section")
-    run_command("netstat -an | findstr 8081", result_box)
-    run_command("netstat -an | findstr 555", result_box)
+    insert_section_title(result_box, "Check Open Connections (netstat)")
+    ports = [8081, 555]
+    for port in ports:
+        command = f"powershell -Command \"netstat -ano | Select-String ':{port}'\""
+        run_command(command, result_box)
 
 def check_fortiedr_manager_status(result_box):
-    result_box.insert("end", "\n─── FortiEDR Collector Status ───\n", "section")
+    insert_section_title(result_box, "FortiEDR Collector Status")
     command = "\"C:\\Program Files\\Fortinet\\FortiEDR\\FortiEDRCollectorService.exe\" --estatus"
     run_command(command, result_box)
 
 def run_all_diagnostics(result_box):
     def task():
-        result_box.tag_config("section", foreground="#FFA500")     # Orange
-        result_box.tag_config("command", foreground="#00BFFF")     # Light blue
-        result_box.tag_config("stdout", foreground="#FFFFFF")      # White
-        result_box.tag_config("stderr", foreground="#FF4444")      # Red
-        result_box.tag_config("banner", foreground="#00FF00")      # Green
+        result_box.tag_config("section", foreground="#FFA500")          # Orange
+        result_box.tag_config("command", foreground="#00BFFF")          # Light blue
+        result_box.tag_config("stdout", foreground="#FFFFFF")           # White
+        result_box.tag_config("stderr", foreground="#FF4444")           # Red
+        result_box.tag_config("banner", foreground="#00FF00")           # Green
+        result_box.tag_config("success_keyword", foreground="#00FF00")  # Green
+        result_box.tag_config("fail_keyword", foreground="#FF4444")     # Red
 
-        result_box.insert("end", "\n" + "="*40 + "\n", "banner")
-        result_box.insert("end", "  FortiEDR Health Check\n", "banner")
-        result_box.insert("end", "="*40 + "\n\n", "banner")
+        insert_banner(result_box, "FortiEDR Health Check")
+
         result_box.update_idletasks()
 
         check_internet_and_dns(result_box)
@@ -114,9 +122,34 @@ def run_all_diagnostics(result_box):
         check_open_ports(result_box)
         check_fortiedr_manager_status(result_box)
 
-        result_box.insert("end", "\n" + "="*40 + "\n", "banner")
-        result_box.insert("end", "  Diagnostics complete\n", "banner")
-        result_box.insert("end", "="*40 + "\n", "banner")
+        insert_banner(result_box, "Diagnostics Complete")
+        highlight_status_keywords(result_box)
+
         result_box.update_idletasks()
 
     threading.Thread(target=task).start()
+
+def insert_banner(result_box, text):
+    result_box.tag_config("banner_simple", foreground="#FFFFFF", background="#145A32")
+    result_box.insert("end", "\n{:^70}\n\n".format(text), "banner_simple")
+
+def clean_tcp_lines_only(text):
+    return "\n".join(line.lstrip() if line.lstrip().startswith("TCP") else line for line in text.splitlines())
+
+def highlight_status_keywords(result_box):
+    green_words = ["True", "Up", "Updated", "Running", "Connected", "ESTABLISHED"]
+    red_words = ["False", "Down", "Disconnected", "STOPPED", "ERROR"]
+
+    for word in green_words:
+        index = result_box.search(word, "1.0", stopindex="end")
+        while index:
+            end_index = f"{index}+{len(word)}c"
+            result_box.tag_add("success_keyword", index, end_index)
+            index = result_box.search(word, end_index, stopindex="end")
+
+    for word in red_words:
+        index = result_box.search(word, "1.0", stopindex="end")
+        while index:
+            end_index = f"{index}+{len(word)}c"
+            result_box.tag_add("fail_keyword", index, end_index)
+            index = result_box.search(word, end_index, stopindex="end")

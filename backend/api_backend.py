@@ -3,19 +3,7 @@ import json
 import pandas as pd
 from datetime import datetime, timedelta
 from tabulate import tabulate
-
-# Bypass SSL verification for all requests (only in dev/demo environments)
-import requests
-from urllib3.exceptions import InsecureRequestWarning
-requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
-
-# Monkey-patch requests.Session to disable SSL verification globally
-original_request = requests.Session.request
-def unsafe_request(self, method, url, **kwargs):
-    kwargs['verify'] = False
-    return original_request(self, method, url, **kwargs)
-requests.Session.request = unsafe_request
-
+from backend.ssl_bypass import *
 import fortiedr
 
 DEFAULT_API_URL = os.getenv("API_URL") or ""
@@ -54,7 +42,8 @@ def save_api_settings(self):
         "organization": self.org_entry.get()
     }
 
-def run_event_query(output_format="Table", items="1", action="All", time_range="1 hour"):
+def run_event_query(output_format="Table", items="1", action="All", time_range="1 hour", host="All"):
+
     auth = fortiedr.auth(
         user=os.getenv("API_USERNAME"),
         passw=os.getenv("API_PASSWORD"),
@@ -80,6 +69,8 @@ def run_event_query(output_format="Table", items="1", action="All", time_range="
             params["itemsPerPage"] = int(items)
         except ValueError:
             pass
+    if host != "All":
+        params["device"] = host
 
     response = method.list_events(**params)
 
@@ -113,7 +104,7 @@ def run_event_query(output_format="Table", items="1", action="All", time_range="
     df = pd.DataFrame(table_data, columns=headers)
     return tabulate(df, headers="keys", tablefmt="fancy_grid", showindex=False)
 
-def run_threat_query(fmt, items, category, time_range):
+def run_threat_query(fmt, items, category, time_range, host="All"):
     """Fetch FortiEDR threat hunting results."""
     auth = fortiedr.auth(
         user=os.getenv("API_USERNAME"),
@@ -132,7 +123,11 @@ def run_threat_query(fmt, items, category, time_range):
         "time": time_range
     }
 
-    # Remove empty values
+    # Ajouter le filtre device seulement si host != "All"
+    if host != "All":
+        params["devices"] = [host]  
+
+    # Supprimer les valeurs nulles
     params = {k: v for k, v in params.items() if v}
 
     response = method.search(**params)
@@ -168,3 +163,5 @@ def run_threat_query(fmt, items, category, time_range):
     headers = ["#", "Time", "Type", "Device Name", "Process Name", "Command Line", "Target Path", "User"]
     df = pd.DataFrame(table_data, columns=headers)
     return tabulate(df, headers="keys", tablefmt="fancy_grid", showindex=False)
+
+

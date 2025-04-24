@@ -2,17 +2,22 @@ import customtkinter as ctk
 import tkinter as tk
 from dotenv import load_dotenv
 import os
+import socket
 from backend.api_backend import run_event_query, run_threat_query, test_api_authentication
+
+hostname = socket.gethostname()
 
 EVENT_FORMATS = ["Table", "JSON"]
 EVENT_ITEMS = ["1", "5", "10", "50", "No limit"]
 EVENT_ACTIONS = ["All", "Block", "SimulationBlock", "Log"]
 EVENT_TIMES = ["1 hour", "2 hours", "12 hours", "24 hours", "48 hours"]
+EVENT_HOSTS = ["All", hostname]
 
 THREAT_FORMATS = ["Table", "JSON"]
 THREAT_CATEGORIES = ["All", "Process", "File", "Registry", "Network", "Log"]
 THREAT_TIMES = ["lastHour", "last12hours", "last24hours", "last7days", "last30days"]
 THREAT_ITEMS = ["1", "5", "10", "100"]
+THREAT_HOSTS = ["All", hostname]
 
 def get_default_api_settings():
     return {
@@ -106,7 +111,7 @@ class FortiEDRAPIView:
             if self.test_btn:
                 self.test_btn.pack_forget()
 
-            self.ev_buttons = {"format": [], "items": [], "action": [], "time": []}
+            self.ev_buttons = {"format": [], "items": [], "action": [], "time": [], "host": []}  
             self.ev_vars = {"format": "Table", "items": "1", "action": "All", "time": "1 hour"}
 
             self.search_btn.pack(in_=self.bottom_frame, side="right", padx=(5, 0))
@@ -121,11 +126,10 @@ class FortiEDRAPIView:
             col2 = ctk.CTkFrame(container, fg_color="transparent", width=180)
             col2.pack(side="left", padx=(30, 0), fill="y")
 
-            # Column 1: Format + Items
+            # Column 1: Format + Items + Hosts
             ctk.CTkLabel(col1, text="Format", font=("Arial", 11, "bold"), text_color="white").pack(anchor="w", pady=(10, 2))
             for opt in EVENT_FORMATS:
-                btn = ctk.CTkButton(col1, text=opt, width=140,
-                    command=lambda v=opt: self.set_var("format", v, "ev"),
+                btn = ctk.CTkButton(col1, text=opt, width=140, command=lambda v=opt: self.set_var("format", v, "ev"),
                     fg_color="#FFA500" if opt == "Table" else "#2e2e2e",
                     hover_color="#FFA500" if opt == "Table" else "#444444",
                     text_color="white")
@@ -135,11 +139,20 @@ class FortiEDRAPIView:
             ctk.CTkLabel(col1, text="Number of Events", font=("Arial", 11, "bold"), text_color="white").pack(anchor="w", pady=(15, 2))
             for opt in EVENT_ITEMS:
                 btn = ctk.CTkButton(col1, text=opt, width=140, command=lambda v=opt: self.set_var("items", v, "ev"),
-                                    fg_color="#FFA500" if opt == "1" else "#2e2e2e",
-                                    hover_color="#FFA500" if opt == "1" else "#444444",
-                                    text_color="white")
+                    fg_color="#FFA500" if opt == "1" else "#2e2e2e",
+                    hover_color="#FFA500" if opt == "1" else "#444444",
+                    text_color="white")
                 btn.pack(pady=2, fill="x")
                 self.ev_buttons["items"].append(btn)
+
+            ctk.CTkLabel(col1, text="Hosts", font=("Arial", 11, "bold"), text_color="white").pack(anchor="w", pady=(15, 2))
+            for opt in EVENT_HOSTS:
+                btn = ctk.CTkButton(col1, text=opt, width=140, command=lambda v=opt: self.set_var("host", v, "ev"),
+                    fg_color="#FFA500" if opt == "All" else "#2e2e2e",
+                    hover_color="#FFA500" if opt == "All" else "#444444",
+                    text_color="white")
+                btn.pack(pady=2, fill="x")
+                self.ev_buttons["host"].append(btn)
 
             # Column 2: Action + Time
             ctk.CTkLabel(col2, text="Action Filter", font=("Arial", 11, "bold"), text_color="white").pack(anchor="w", pady=(10, 2))
@@ -165,8 +178,7 @@ class FortiEDRAPIView:
             if self.test_btn:
                 self.test_btn.pack_forget()
 
-            # Réinitialiser les boutons et les valeurs sélectionnées
-            self.th_buttons = {"format": [], "items": [], "category": [], "time": []}
+            self.th_buttons = {"format": [], "items": [], "category": [], "time": [], "host": []}  
             self.th_vars = {"format": "Table", "items": "1", "category": "All", "time": "lastHour"}
 
             self.search_btn.pack(in_=self.bottom_frame, side="right", padx=(5, 0))
@@ -181,7 +193,7 @@ class FortiEDRAPIView:
             col2 = ctk.CTkFrame(container, fg_color="transparent", width=180)
             col2.pack(side="left", padx=(30, 0), fill="y")
 
-            # Column 1: Format + Items
+            # Column 1: Format + Items + Hosts
             ctk.CTkLabel(col1, text="Format", font=("Arial", 11, "bold"), text_color="white").pack(anchor="w", pady=(10, 2))
             for opt in THREAT_FORMATS:
                 btn = ctk.CTkButton(col1, text=opt, width=140, command=lambda v=opt: self.set_var("format", v, "th"),
@@ -200,6 +212,15 @@ class FortiEDRAPIView:
                 btn.pack(pady=2, fill="x")
                 self.th_buttons["items"].append(btn)
 
+            ctk.CTkLabel(col1, text="Hosts", font=("Arial", 11, "bold"), text_color="white").pack(anchor="w", pady=(15, 2))
+            for opt in THREAT_HOSTS:
+                btn = ctk.CTkButton(col1, text=opt, width=140, command=lambda v=opt: self.set_var("host", v, "th"),
+                                    fg_color="#FFA500" if opt == "All" else "#2e2e2e",
+                                    hover_color="#FFA500" if opt == "All" else "#444444",
+                                    text_color="white")
+                btn.pack(pady=2, fill="x")
+                self.th_buttons["host"].append(btn)
+                
             # Column 2: Category + Time
             ctk.CTkLabel(col2, text="Category", font=("Arial", 11, "bold"), text_color="white").pack(anchor="w", pady=(10, 2))
             for opt in THREAT_CATEGORIES:
@@ -318,7 +339,8 @@ class FortiEDRAPIView:
                     output_format=vals.get("format", "table"),
                     items=vals.get("items", "1"),
                     action=vals.get("action", "All"),
-                    time_range=vals.get("time", "1 hour")
+                    time_range=vals.get("time", "1 hour"),
+                    host=vals.get("host", "All") 
                 )
 
                 recap = f"FortiEDR Events — Format: {vals.get('format')} | Time: {vals.get('time')} | Action: {vals.get('action')} | Items: {vals.get('items')}\n\n"
@@ -339,7 +361,8 @@ class FortiEDRAPIView:
                     fmt=vals.get("format", "table"),
                     items=vals.get("items", "1"),
                     category=vals.get("category", "All"),
-                    time_range=vals.get("time", "lastHour")
+                    time_range=vals.get("time", "lastHour"),
+                    host=vals.get("host", "All") 
                 )
 
                 recap = f"Threat Hunting — Format: {vals.get('format')} | Time: {vals.get('time')} | Category: {vals.get('category')} | Items: {vals.get('items')}\n\n"
@@ -399,42 +422,6 @@ class FortiEDRAPIView:
             else:
                 self.result_box.tag_add("number", value_index, f"{value_index}+{len(value)+1}c")
 
-    # JSON FORMAT
-    # def test_api(self):
-    #     from backend.api_backend import test_api_authentication
-
-    #     self.result_box.delete("0.0", "end")
-
-    #     result = test_api_authentication(
-    #         url=self.api_settings["url"],
-    #         username=self.api_settings["username"],
-    #         password=self.api_settings["password"],
-    #         organization=self.api_settings["organization"]
-    #     )
-
-    #     if isinstance(result, dict) and result.get("status"):
-    #         self.result_box.insert("0.0", "Authentication successful!\n\n")
-    #         self.result_box.tag_config("success", foreground="#00FF00")
-    #         self.result_box.tag_add("success", "1.0", "2.0")
-
-    #         recap = (
-    #             f'URL: {self.api_settings["url"]}\n'
-    #             f'Username: {self.api_settings["username"]}\n'
-    #             f'Organization: {self.api_settings["organization"]}\n\n'
-    #         )
-    #         recap_start = self.result_box.index("end-1c")
-    #         self.result_box.insert("end", recap)
-    #         self.result_box.tag_config("field", foreground="#FFA500")
-    #         for field in ["URL", "Username", "Organization"]:
-    #             self.highlight_word(recap_start, field, "field")
-
-    #         self.highlight_json(json.dumps(result["data"], indent=2))
-
-    #     else:
-    #         self.result_box.insert("0.0", f"Authentication failed.\n\n{result.get('data', 'Unknown error')}")
-    #         self.result_box.tag_config("error", foreground="#FF4444")
-    #         self.result_box.tag_add("error", "1.0", "3.0")
-    
     def test_api(self):
         from backend.api_backend import test_api_authentication
 
@@ -544,7 +531,7 @@ class FortiEDRAPIView:
             group = self.th_buttons.get(key, [])
         else:
             return
-
+        
         # Update button colors in this group
         for btn in group:
             try:

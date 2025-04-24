@@ -14,13 +14,13 @@ tests = [
     {
         "id": "T1036.003",
         "title": "Masquerading: Rename System Utilities",
-        "test": "Masquerading - Windows EXE running as different Windows EXE",
-        "description": "Copies a Windows EXE, renames it as another EXE, and runs it to masquerade as a system utility.",
+        "test": "Masquerading - non-windows exe running as windows exe",
+        "description": "Copies an exe, renames it as a windows exe, and launches it to masquerade as a real windows exe. Upon successful execution, powershell will execute T1036.003.exe as svchost.exe from on a non-standard path.",
         "rules": [
             "Exfiltration Prevention",
             "- Fake Critical Program - Attempted to Hide as a Service"
         ],
-        "command": "Invoke-AtomicTest T1036.003 -TestNumbers 7"
+        "command": "Invoke-AtomicTest T1036.003 -TestNumbers 6"
     },
     {
         "id": "T1055",

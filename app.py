@@ -2,7 +2,6 @@ import tkinter as tk
 import customtkinter as ctk
 from PIL import Image, ImageTk
 import os
-import sys
 import socket
 import threading
 from dotenv import load_dotenv
@@ -42,7 +41,8 @@ class FortiEDRDemoTool(ctk.CTk):
     def __init__(self):
         super().__init__()
         self.title("FortiEDR Demo Tool")
-        self.attributes("-fullscreen", True)
+        #self.attributes("-fullscreen", True)
+        self.geometry("1280x720")
         self.bind("<Escape>", lambda e: self.attributes("-fullscreen", False))
         
         self.iconbitmap(resource_path(os.path.join("assets", "fortinet.ico")))
@@ -108,7 +108,7 @@ class FortiEDRDemoTool(ctk.CTk):
         except Exception:
             ip_address = "Unavailable"
 
-        host_info_text = f"Host: {local_hostname}\nIP: {ip_address}"
+        host_info_text = f"{local_hostname}\n{ip_address}"
         self.hostinfo_label = ctk.CTkLabel(
             host_info_frame,
             text=host_info_text,
@@ -117,11 +117,6 @@ class FortiEDRDemoTool(ctk.CTk):
             justify="center"
         )
         self.hostinfo_label.pack(pady=5)
-
-        # AV Scanner Button
-        self.av_btn = create_nav_button(self.nav_frame, "AV Scanner", lambda: self.show_av_scanner())
-        self.av_btn.configure(fg_color="#006400", hover_color="#228B22")
-        self.av_btn.grid(row=6, column=0, pady=5, padx=10, sticky="ew")
 
         # Health Check Button
         self.diagnostic_btn = create_nav_button(self.nav_frame, "Health Check", lambda: self.show_diagnostics())
@@ -197,21 +192,6 @@ class FortiEDRDemoTool(ctk.CTk):
 
         # Lancer le diagnostic dans un thread pour ne pas bloquer l'UI
         threading.Thread(target=lambda: run_all_diagnostics(self.result_box)).start()
-
-    def show_av_scanner(self):
-        for widget in self.results_frame.winfo_children():
-            widget.destroy()
-
-        self.result_box = ctk.CTkTextbox(self.results_frame, font=("Courier New", 13))
-        self.result_box.pack(expand=True, fill="both", padx=10, pady=10)
-
-        self.result_box.tag_config("orange", foreground="#FFA500")
-        self.result_box.tag_config("red", foreground="red")
-        self.result_box.tag_config("green", foreground="#00FF00")
-        self.result_box.tag_config("white", foreground="#ffffff")
-
-        from backend.FortiEDRAvScanner import run_av_scan
-        run_av_scan(self.result_box)
 
 if __name__ == "__main__":
     app = FortiEDRDemoTool()

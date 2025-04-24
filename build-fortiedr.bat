@@ -26,12 +26,17 @@ if errorlevel 1 (
 
 REM Clean previous build folders
 echo Cleaning build and dist folders...
-rmdir /s /q build
-rmdir /s /q dist
+if exist build rmdir /s /q build
+if exist dist rmdir /s /q dist
 
 REM Build the executable with the custom .spec file
 echo Running PyInstaller...
 pyinstaller FortiEDRDemoTool.spec
+if errorlevel 1 (
+    echo.
+    echo ERROR: PyInstaller failed to build the executable.
+    exit /b 1
+)
 
 REM Check if the .exe was created
 if exist dist\FortiEDRDemoTool.exe (
@@ -40,9 +45,14 @@ if exist dist\FortiEDRDemoTool.exe (
     echo Moving FortiEDRDemoTool.exe to Desktop...
 
     set desktop=%USERPROFILE%\Desktop
-    move /Y "dist\FortiEDRDemoTool.exe" "%desktop%\FortiEDRDemoTool.exe"
+    echo Desktop path is: %desktop%
+    copy /Y "dist\FortiEDRDemoTool.exe" "%desktop%\FortiEDRDemoTool.exe"
+    color 0A
     echo EXE successfully moved to your Desktop.
+    color 07
 ) else (
     echo.
+    color 0C
     echo ERROR: EXE file not found. Please check for build errors.
+    color 07
 )
