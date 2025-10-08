@@ -4,14 +4,17 @@ from PIL import Image, ImageTk
 import os
 import socket
 import threading
+from utils import resource_path
+
 from dotenv import load_dotenv
+# Load environment variables from .env file
+load_dotenv(resource_path('.env'))
 
 from gui.mitre_gui import MitreView
 from gui.malware_gui import MalwareBazaarView
 from gui.api_gui import FortiEDRAPIView
 from backend.diagnostics import run_all_diagnostics
 from backend.FortiEDRAvScanner import run_av_scan
-from utils import resource_path
 
 
 # Debug .env path
@@ -33,9 +36,6 @@ from utils import resource_path
 # Always start in dark mode
 ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("dark-blue")
-
-# Load environment variables from .env file
-load_dotenv(resource_path('.env'))
 
 class FortiEDRDemoTool(ctk.CTk):
     def __init__(self):

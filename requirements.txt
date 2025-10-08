@@ -8,3 +8,4 @@ requests
 pyzipper
 CTkSpinbox
 pyinstaller
+cryptography

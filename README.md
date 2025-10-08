@@ -5,7 +5,7 @@ This project helps visualize **MITRE techniques**, simulate **malware analysis**
 
 ---
 
-## 🎬 Demo Video (coming very soon)
+## 🎬 Demo Video (coming soon)
 
 ---
 
@@ -14,10 +14,15 @@ This project helps visualize **MITRE techniques**, simulate **malware analysis**
 Before running the app, create a `.env` file in the root directory with the following content:
 
 ```
-API_URL=https://fortiedr-host.example.com
-API_USERNAME=username
-API_PASSWORD=password
-API_ORG=MyOrganization # Case sensitive
+# FortiEDR API Credentials
+API_URL="https://fortiedr-host.example.com"
+API_USERNAME="username"
+API_PASSWORD="password"
+API_ORG="MyOrganization" # Case sensitive
+
+# Malware Bazaar API Auth Key
+# https://bazaar.abuse.ch/api/
+MB_AUTH_KEY="abcdefghijklmnopqrstuvwxyz"
 ```
 
 This file is required to authenticate with the FortiEDR API.
